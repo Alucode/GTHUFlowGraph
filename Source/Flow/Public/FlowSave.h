@@ -55,7 +55,7 @@ struct FLOW_API FFlowComponentSaveData
 	FString WorldName;
 
 	UPROPERTY(SaveGame, VisibleAnywhere, Category = "Flow")
-	FString ActorInstanceName;
+	FString ActorClassName;
 
 	UPROPERTY(SaveGame)
 	TArray<uint8> ComponentData;
@@ -74,13 +74,13 @@ struct FLOW_API FFlowArchive : public FObjectAndNameAsStringProxyArchive
 	}
 };
 
-UCLASS(BlueprintType)
-class FLOW_API UFlowSaveGame : public USaveGame
+USTRUCT(BlueprintType)
+struct FLOW_API FFlowSaveGameData
 {
-	GENERATED_BODY()
+	GENERATED_USTRUCT_BODY()
 
 public:
-	UFlowSaveGame() {};
+	FFlowSaveGameData() {};
 
 	UPROPERTY(VisibleAnywhere, Category = "SaveGame")
 	FString SaveSlotName = TEXT("FlowSave");
@@ -91,7 +91,7 @@ public:
 	UPROPERTY(VisibleAnywhere, Category = "Flow")
 	TArray<FFlowAssetSaveData> FlowInstances;
 	
-	friend FArchive& operator<<(FArchive& Ar, UFlowSaveGame& SaveGame)
+	friend FArchive& operator<<(FArchive& Ar, FFlowSaveGameData& SaveGame)
 	{
 		Ar << SaveGame.FlowComponents;
 		Ar << SaveGame.FlowInstances;

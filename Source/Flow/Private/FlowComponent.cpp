@@ -47,7 +47,7 @@ void UFlowComponent::BeginPlay()
 	if (UFlowSubsystem* FlowSubsystem = GetFlowSubsystem())
 	{
 		bool bComponentLoadedFromSaveGame = false;
-		if (GetFlowSubsystem()->GetLoadedSaveGame())
+		if (GetFlowSubsystem()->IsSaveGameLoaded())
 		{
 			bComponentLoadedFromSaveGame = LoadInstance();
 		}
@@ -442,7 +442,7 @@ FFlowComponentSaveData UFlowComponent::SaveInstance()
 {
 	FFlowComponentSaveData ComponentRecord;
 	ComponentRecord.WorldName = GetWorld()->GetName();
-	ComponentRecord.ActorInstanceName = GetOwner()->GetName();
+	ComponentRecord.ActorClassName = GetOwner()->GetClass()->GetName();
 
 	// opportunity to collect data before serializing component
 	OnSave();
@@ -457,12 +457,14 @@ FFlowComponentSaveData UFlowComponent::SaveInstance()
 
 bool UFlowComponent::LoadInstance()
 {
-	const UFlowSaveGame* SaveGame = GetFlowSubsystem()->GetLoadedSaveGame();
-	if (SaveGame->FlowComponents.Num() > 0)
+	const FFlowSaveGameData& SaveGame = GetFlowSubsystem()->GetLoadedSaveGame();
+	if (SaveGame.FlowComponents.Num() > 0)
 	{
-		for (const FFlowComponentSaveData& ComponentRecord : SaveGame->FlowComponents)
+		for (const FFlowComponentSaveData& ComponentRecord : SaveGame.FlowComponents)
 		{
-			if (ComponentRecord.WorldName == GetWorld()->GetName() && ComponentRecord.ActorInstanceName == GetOwner()->GetName())
+			FString WorldName = GetWorld()->GetName();
+			FString ActorClassName = GetOwner()->GetClass()->GetName();
+			if (ComponentRecord.WorldName == WorldName && ComponentRecord.ActorClassName == ActorClassName)
 			{
 				FMemoryReader MemoryReader(ComponentRecord.ComponentData, true);
 				FFlowArchive Ar(MemoryReader);
