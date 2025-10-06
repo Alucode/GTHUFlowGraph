@@ -305,8 +305,10 @@ UWorld* UFlowSubsystem::GetWorld() const
 	return GetGameInstance()->GetWorld();
 }
 
-void UFlowSubsystem::OnGameSaved(UFlowSaveGame* SaveGame)
+FFlowSaveGameData UFlowSubsystem::OnGameSaved()
 {
+	FFlowSaveGameData SaveGame;
+
 	// clear existing data, in case we received reused SaveGame instance
 	// we only remove data for the current world + global Flow Graph instances (i.e. not bound to any world if created by UGameInstanceSubsystem)
 	// we keep data bound to other worlds
@@ -314,19 +316,19 @@ void UFlowSubsystem::OnGameSaved(UFlowSaveGame* SaveGame)
 	{
 		const FString& WorldName = GetWorld()->GetName();
 
-		for (int32 i = SaveGame->FlowInstances.Num() - 1; i >= 0; i--)
+		for (int32 i = SaveGame.FlowInstances.Num() - 1; i >= 0; i--)
 		{
-			if (SaveGame->FlowInstances[i].WorldName.IsEmpty() || SaveGame->FlowInstances[i].WorldName == WorldName)
+			if (SaveGame.FlowInstances[i].WorldName.IsEmpty() || SaveGame.FlowInstances[i].WorldName == WorldName)
 			{
-				SaveGame->FlowInstances.RemoveAt(i);
+				SaveGame.FlowInstances.RemoveAt(i);
 			}
 		}
 
-		for (int32 i = SaveGame->FlowComponents.Num() - 1; i >= 0; i--)
+		for (int32 i = SaveGame.FlowComponents.Num() - 1; i >= 0; i--)
 		{
-			if (SaveGame->FlowComponents[i].WorldName.IsEmpty() || SaveGame->FlowComponents[i].WorldName == WorldName)
+			if (SaveGame.FlowComponents[i].WorldName.IsEmpty() || SaveGame.FlowComponents[i].WorldName == WorldName)
 			{
-				SaveGame->FlowComponents.RemoveAt(i);
+				SaveGame.FlowComponents.RemoveAt(i);
 			}
 		}
 	}
@@ -338,11 +340,11 @@ void UFlowSubsystem::OnGameSaved(UFlowSaveGame* SaveGame)
 		{
 			if (UFlowComponent* FlowComponent = Cast<UFlowComponent>(RootInstance.Value))
 			{
-				FlowComponent->SaveRootFlow(SaveGame->FlowInstances);
+				FlowComponent->SaveRootFlow(SaveGame.FlowInstances);
 			}
 			else
 			{
-				RootInstance.Key->SaveInstance(SaveGame->FlowInstances);
+				RootInstance.Key->SaveInstance(SaveGame.FlowInstances);
 			}
 		}
 	}
@@ -359,14 +361,17 @@ void UFlowSubsystem::OnGameSaved(UFlowSaveGame* SaveGame)
 		// write archives to SaveGame
 		for (const TWeakObjectPtr<UFlowComponent> RegisteredComponent : RegisteredComponents)
 		{
-			SaveGame->FlowComponents.Emplace(RegisteredComponent->SaveInstance());
+			SaveGame.FlowComponents.Emplace(RegisteredComponent->SaveInstance());
 		}
 	}
+
+	return SaveGame;
 }
 
-void UFlowSubsystem::OnGameLoaded(UFlowSaveGame* SaveGame)
+void UFlowSubsystem::OnGameLoaded(FFlowSaveGameData SaveGame)
 {
 	LoadedSaveGame = SaveGame;
+	bSaveGameLoaded = true;
 
 	// here's opportunity to apply loaded data to custom systems
 	// it's recommended to do this by overriding method in the subclass
@@ -379,7 +384,7 @@ void UFlowSubsystem::LoadRootFlow(UObject* Owner, UFlowAsset* FlowAsset, const F
 		return;
 	}
 
-	for (const FFlowAssetSaveData& AssetRecord : LoadedSaveGame->FlowInstances)
+	for (const FFlowAssetSaveData& AssetRecord : LoadedSaveGame.FlowInstances)
 	{
 		if (AssetRecord.InstanceName == SavedAssetInstanceName
 			&& (FlowAsset->IsBoundToWorld() == false || AssetRecord.WorldName == GetWorld()->GetName()))
@@ -403,7 +408,7 @@ void UFlowSubsystem::LoadSubFlow(UFlowNode_SubGraph* SubGraphNode, const FString
 
 	UFlowAsset* SubGraphAsset = SubGraphNode->Asset.LoadSynchronous();
 
-	for (const FFlowAssetSaveData& AssetRecord : LoadedSaveGame->FlowInstances)
+	for (const FFlowAssetSaveData& AssetRecord : LoadedSaveGame.FlowInstances)
 	{
 		if (AssetRecord.InstanceName == SavedAssetInstanceName
 			&& ((SubGraphAsset && SubGraphAsset->IsBoundToWorld() == false) || AssetRecord.WorldName == GetWorld()->GetName()))
