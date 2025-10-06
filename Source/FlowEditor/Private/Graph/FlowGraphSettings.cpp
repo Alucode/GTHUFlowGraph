@@ -40,6 +40,7 @@ UFlowGraphSettings::UFlowGraphSettings(const FObjectInitializer& ObjectInitializ
 	NodeTitleColors.Emplace(EFlowNodeStyle::Latent, FLinearColor(0.0f, 0.770f, 0.375f, 1.0f));
 	NodeTitleColors.Emplace(EFlowNodeStyle::Logic, FLinearColor(1.0f, 1.0f, 1.0f, 1.0f));
 	NodeTitleColors.Emplace(EFlowNodeStyle::SubGraph, FLinearColor(1.0f, 0.128f, 0.0f, 1.0f));
+	NodeTitleColors.Emplace(EFlowNodeStyle::Development, FLinearColor(0.5f, 0.f, 1.0f, 1.0f));
 }
 
 #undef LOCTEXT_NAMESPACE
