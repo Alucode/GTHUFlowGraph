@@ -60,7 +60,9 @@ public:
 
 protected:
 	UPROPERTY()
-	TObjectPtr<UFlowSaveGame> LoadedSaveGame;
+		FFlowSaveGameData LoadedSaveGame;
+
+	bool bSaveGameLoaded = false;
 
 public:
 	virtual bool ShouldCreateSubsystem(UObject* Outer) const override;
@@ -125,10 +127,11 @@ public:
 	FSimpleFlowEvent OnSaveGame;
 
 	UFUNCTION(BlueprintCallable, Category = "FlowSubsystem")
-	virtual void OnGameSaved(UFlowSaveGame* SaveGame);
+	virtual FFlowSaveGameData OnGameSaved();
 
 	UFUNCTION(BlueprintCallable, Category = "FlowSubsystem")
-	virtual void OnGameLoaded(UFlowSaveGame* SaveGame);
+	virtual void OnGameLoaded(FFlowSaveGameData SaveGame);
+
 
 	UFUNCTION(BlueprintCallable, Category = "FlowSubsystem")
 	virtual void LoadRootFlow(UObject* Owner, UFlowAsset* FlowAsset, const FString& SavedAssetInstanceName, const bool bAllowMultipleInstances);
@@ -137,7 +140,11 @@ public:
 	virtual void LoadSubFlow(UFlowNode_SubGraph* SubGraphNode, const FString& SavedAssetInstanceName);
 
 	UFUNCTION(BlueprintPure, Category = "FlowSubsystem")
-	UFlowSaveGame* GetLoadedSaveGame() const { return LoadedSaveGame; }
+		FFlowSaveGameData& GetLoadedSaveGame() { return LoadedSaveGame; }
+
+	// TODO: There should probably be a function to clear LoadedSaveGame, since the player could back out of the game and then choose another save data, or start a new game.
+	UFUNCTION(BlueprintPure, Category = "FlowSubsystem")
+		bool IsSaveGameLoaded() { return bSaveGameLoaded; }
 
 //////////////////////////////////////////////////////////////////////////
 // Component Registry
