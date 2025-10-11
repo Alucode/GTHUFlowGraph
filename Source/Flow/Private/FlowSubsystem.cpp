@@ -25,7 +25,6 @@ FNativeFlowAssetEvent UFlowSubsystem::OnInstancedTemplateRemoved;
 #define LOCTEXT_NAMESPACE "FlowSubsystem"
 
 UFlowSubsystem::UFlowSubsystem()
-	: LoadedSaveGame(nullptr)
 {
 }
 
