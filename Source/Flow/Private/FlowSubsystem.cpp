@@ -11,9 +11,16 @@
 
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
-#include "Misc/FileHelper.h"
+#include "Logging/MessageLog.h"
 #include "Misc/Paths.h"
 #include "UObject/UObjectHash.h"
+
+#if WITH_EDITOR
+FNativeFlowAssetEvent UFlowSubsystem::OnInstancedTemplateAdded;
+FNativeFlowAssetEvent UFlowSubsystem::OnInstancedTemplateRemoved;
+#endif
+
+#define LOCTEXT_NAMESPACE "FlowSubsystem"
 
 UFlowSubsystem::UFlowSubsystem()
 	: UGameInstanceSubsystem()
@@ -69,11 +76,20 @@ void UFlowSubsystem::AbortActiveFlows()
 
 void UFlowSubsystem::StartRootFlow(UObject* Owner, UFlowAsset* FlowAsset, const bool bAllowMultipleInstances /* = true */)
 {
-	UFlowAsset* NewFlow = CreateRootFlow(Owner, FlowAsset, bAllowMultipleInstances);
-	if (NewFlow)
+	if (FlowAsset)
 	{
-		NewFlow->StartFlow();
+		if (UFlowAsset* NewFlow = CreateRootFlow(Owner, FlowAsset, bAllowMultipleInstances))
+		{
+			NewFlow->StartFlow();
+		}
 	}
+#if WITH_EDITOR
+	else
+	{
+		FMessageLog("PIE").Error(LOCTEXT("StartRootFlowNullAsset", "Attempted to start Root Flow with a null asset."))
+		                  ->AddToken(FUObjectToken::Create(Owner));
+	}
+#endif
 }
 
 UFlowAsset* UFlowSubsystem::CreateRootFlow(UObject* Owner, UFlowAsset* FlowAsset, const bool bAllowMultipleInstances)
@@ -94,7 +110,10 @@ UFlowAsset* UFlowSubsystem::CreateRootFlow(UObject* Owner, UFlowAsset* FlowAsset
 	}
 
 	UFlowAsset* NewFlow = CreateFlowInstance(Owner, FlowAsset);
-	RootInstances.Add(NewFlow, Owner);
+	if (NewFlow)
+	{
+		RootInstances.Add(NewFlow, Owner);
+	}
 
 	return NewFlow;
 }
@@ -102,7 +121,7 @@ UFlowAsset* UFlowSubsystem::CreateRootFlow(UObject* Owner, UFlowAsset* FlowAsset
 void UFlowSubsystem::FinishRootFlow(UObject* Owner, UFlowAsset* TemplateAsset, const EFlowFinishPolicy FinishPolicy)
 {
 	UFlowAsset* InstanceToFinish = nullptr;
-	
+
 	for (TPair<UFlowAsset*, TWeakObjectPtr<UObject>>& RootInstance : RootInstances)
 	{
 		if (Owner && Owner == RootInstance.Value.Get() && RootInstance.Key && RootInstance.Key->GetTemplateAsset() == TemplateAsset)
@@ -122,7 +141,7 @@ void UFlowSubsystem::FinishRootFlow(UObject* Owner, UFlowAsset* TemplateAsset, c
 void UFlowSubsystem::FinishAllRootFlows(UObject* Owner, const EFlowFinishPolicy FinishPolicy)
 {
 	TArray<UFlowAsset*> InstancesToFinish;
-	
+
 	for (TPair<UFlowAsset*, TWeakObjectPtr<UObject>>& RootInstance : RootInstances)
 	{
 		if (Owner && Owner == RootInstance.Value.Get() && RootInstance.Key)
@@ -146,15 +165,19 @@ UFlowAsset* UFlowSubsystem::CreateSubFlow(UFlowNode_SubGraph* SubGraphNode, cons
 	{
 		const TWeakObjectPtr<UObject> Owner = SubGraphNode->GetFlowAsset() ? SubGraphNode->GetFlowAsset()->GetOwner() : nullptr;
 		NewInstance = CreateFlowInstance(Owner, SubGraphNode->Asset, SavedInstanceName);
-		InstancedSubFlows.Add(SubGraphNode, NewInstance);
 
-		if (bPreloading)
+		if (NewInstance)
 		{
-			NewInstance->PreloadNodes();
+			InstancedSubFlows.Add(SubGraphNode, NewInstance);
+
+			if (bPreloading)
+			{
+				NewInstance->PreloadNodes();
+			}
 		}
 	}
 
-	if (!bPreloading)
+	if (InstancedSubFlows.Contains(SubGraphNode) && !bPreloading)
 	{
 		// get instanced asset from map - in case it was already instanced by calling CreateSubFlow() with bPreloading == true
 		UFlowAsset* AssetInstance = InstancedSubFlows[SubGraphNode];
@@ -188,39 +211,56 @@ void UFlowSubsystem::RemoveSubFlow(UFlowNode_SubGraph* SubGraphNode, const EFlow
 
 UFlowAsset* UFlowSubsystem::CreateFlowInstance(const TWeakObjectPtr<UObject> Owner, TSoftObjectPtr<UFlowAsset> FlowAsset, FString NewInstanceName)
 {
-	check(!FlowAsset.IsNull());
-
-	if (FlowAsset.IsPending() || !FlowAsset.IsValid())
+	UFlowAsset* LoadedFlowAsset = FlowAsset.LoadSynchronous();
+	if (LoadedFlowAsset == nullptr)
 	{
-		FlowAsset = Cast<UFlowAsset>(Streamable.LoadSynchronous(FlowAsset.ToSoftObjectPath(), false));
+		return nullptr;
 	}
 
-	InstancedTemplates.Add(FlowAsset.Get());
+	AddInstancedTemplate(LoadedFlowAsset);
 
 #if WITH_EDITOR
 	if (GetWorld()->WorldType != EWorldType::Game)
 	{
 		// Fix connections - even in packaged game if assets haven't been re-saved in the editor after changing node's definition
-		FlowAsset.Get()->HarvestNodeConnections();
+		LoadedFlowAsset->HarvestNodeConnections();
 	}
 #endif
 
 	// it won't be empty, if we're restoring Flow Asset instance from the SaveGame
 	if (NewInstanceName.IsEmpty())
 	{
-		NewInstanceName = MakeUniqueObjectName(this, UFlowAsset::StaticClass(), *FPaths::GetBaseFilename(FlowAsset.Get()->GetPathName())).ToString();
+		NewInstanceName = MakeUniqueObjectName(this, UFlowAsset::StaticClass(), *FPaths::GetBaseFilename(LoadedFlowAsset->GetPathName())).ToString();
 	}
 
-	UFlowAsset* NewInstance = NewObject<UFlowAsset>(this, FlowAsset->GetClass(), *NewInstanceName, RF_Transient, FlowAsset.Get(), false, nullptr);
-	NewInstance->InitializeInstance(Owner, FlowAsset.Get());
+	UFlowAsset* NewInstance = NewObject<UFlowAsset>(this, LoadedFlowAsset->GetClass(), *NewInstanceName, RF_Transient, LoadedFlowAsset, false, nullptr);
+	NewInstance->InitializeInstance(Owner, LoadedFlowAsset);
 
-	FlowAsset.Get()->AddInstance(NewInstance);
+	LoadedFlowAsset->AddInstance(NewInstance);
 
 	return NewInstance;
 }
 
+void UFlowSubsystem::AddInstancedTemplate(UFlowAsset* Template)
+{
+	if (!InstancedTemplates.Contains(Template))
+	{
+		InstancedTemplates.Add(Template);
+
+#if WITH_EDITOR
+		Template->RuntimeLog = MakeShareable(new FFlowMessageLog());
+		OnInstancedTemplateAdded.ExecuteIfBound(Template);
+#endif
+	}
+}
+
 void UFlowSubsystem::RemoveInstancedTemplate(UFlowAsset* Template)
 {
+#if WITH_EDITOR
+	OnInstancedTemplateRemoved.ExecuteIfBound(Template);
+	Template->RuntimeLog.Reset();
+#endif
+
 	InstancedTemplates.Remove(Template);
 }
 
@@ -263,8 +303,10 @@ UWorld* UFlowSubsystem::GetWorld() const
 	return GetGameInstance()->GetWorld();
 }
 
-void UFlowSubsystem::OnGameSaved(UFlowSaveGame* SaveGame)
+FFlowSaveGameData UFlowSubsystem::OnGameSaved()
 {
+	FFlowSaveGameData SaveGame;
+
 	// clear existing data, in case we received reused SaveGame instance
 	// we only remove data for the current world + global Flow Graph instances (i.e. not bound to any world if created by UGameInstanceSubsystem)
 	// we keep data bound to other worlds
@@ -272,19 +314,19 @@ void UFlowSubsystem::OnGameSaved(UFlowSaveGame* SaveGame)
 	{
 		const FString& WorldName = GetWorld()->GetName();
 
-		for (int32 i = SaveGame->FlowInstances.Num() - 1; i >= 0; i--)
+		for (int32 i = SaveGame.FlowInstances.Num() - 1; i >= 0; i--)
 		{
-			if (SaveGame->FlowInstances[i].WorldName.IsEmpty() || SaveGame->FlowInstances[i].WorldName == WorldName)
+			if (SaveGame.FlowInstances[i].WorldName.IsEmpty() || SaveGame.FlowInstances[i].WorldName == WorldName)
 			{
-				SaveGame->FlowInstances.RemoveAt(i);
+				SaveGame.FlowInstances.RemoveAt(i);
 			}
 		}
 
-		for (int32 i = SaveGame->FlowComponents.Num() - 1; i >= 0; i--)
+		for (int32 i = SaveGame.FlowComponents.Num() - 1; i >= 0; i--)
 		{
-			if (SaveGame->FlowComponents[i].WorldName.IsEmpty() || SaveGame->FlowComponents[i].WorldName == WorldName)
+			if (SaveGame.FlowComponents[i].WorldName.IsEmpty() || SaveGame.FlowComponents[i].WorldName == WorldName)
 			{
-				SaveGame->FlowComponents.RemoveAt(i);
+				SaveGame.FlowComponents.RemoveAt(i);
 			}
 		}
 	}
@@ -296,11 +338,11 @@ void UFlowSubsystem::OnGameSaved(UFlowSaveGame* SaveGame)
 		{
 			if (UFlowComponent* FlowComponent = Cast<UFlowComponent>(RootInstance.Value))
 			{
-				FlowComponent->SaveRootFlow(SaveGame->FlowInstances);
+				FlowComponent->SaveRootFlow(SaveGame.FlowInstances);
 			}
 			else
 			{
-				RootInstance.Key->SaveInstance(SaveGame->FlowInstances);
+				RootInstance.Key->SaveInstance(SaveGame.FlowInstances);
 			}
 		}
 	}
@@ -317,14 +359,20 @@ void UFlowSubsystem::OnGameSaved(UFlowSaveGame* SaveGame)
 		// write archives to SaveGame
 		for (const TWeakObjectPtr<UFlowComponent> RegisteredComponent : RegisteredComponents)
 		{
-			SaveGame->FlowComponents.Emplace(RegisteredComponent->SaveInstance());
+			SaveGame.FlowComponents.Emplace(RegisteredComponent->SaveInstance());
 		}
 	}
+
+	return SaveGame;
 }
 
-void UFlowSubsystem::OnGameLoaded(UFlowSaveGame* SaveGame)
+void UFlowSubsystem::OnGameLoaded(FFlowSaveGameData SaveGame)
 {
 	LoadedSaveGame = SaveGame;
+	bSaveGameLoaded = true;
+
+	// here's opportunity to apply loaded data to custom systems
+	// it's recommended to do this by overriding method in the subclass
 }
 
 void UFlowSubsystem::LoadRootFlow(UObject* Owner, UFlowAsset* FlowAsset, const FString& SavedAssetInstanceName)
@@ -334,7 +382,7 @@ void UFlowSubsystem::LoadRootFlow(UObject* Owner, UFlowAsset* FlowAsset, const F
 		return;
 	}
 
-	for (const FFlowAssetSaveData& AssetRecord : LoadedSaveGame->FlowInstances)
+	for (const FFlowAssetSaveData& AssetRecord : LoadedSaveGame.FlowInstances)
 	{
 		if (AssetRecord.InstanceName == SavedAssetInstanceName
 			&& (FlowAsset->IsBoundToWorld() == false || AssetRecord.WorldName == GetWorld()->GetName()))
@@ -356,16 +404,12 @@ void UFlowSubsystem::LoadSubFlow(UFlowNode_SubGraph* SubGraphNode, const FString
 		return;
 	}
 
-	if (SubGraphNode->Asset.IsPending())
-	{
-		const FSoftObjectPath& AssetRef = SubGraphNode->Asset.ToSoftObjectPath();
-		Streamable.LoadSynchronous(AssetRef, false);
-	}
+	UFlowAsset* SubGraphAsset = SubGraphNode->Asset.LoadSynchronous();
 
-	for (const FFlowAssetSaveData& AssetRecord : LoadedSaveGame->FlowInstances)
+	for (const FFlowAssetSaveData& AssetRecord : LoadedSaveGame.FlowInstances)
 	{
 		if (AssetRecord.InstanceName == SavedAssetInstanceName
-			&& ((SubGraphNode->Asset && SubGraphNode->Asset->IsBoundToWorld() == false) || AssetRecord.WorldName == GetWorld()->GetName()))
+			&& ((SubGraphAsset && SubGraphAsset->IsBoundToWorld() == false) || AssetRecord.WorldName == GetWorld()->GetName()))
 		{
 			UFlowAsset* LoadedInstance = CreateSubFlow(SubGraphNode, SavedAssetInstanceName);
 			if (LoadedInstance)
@@ -619,3 +663,5 @@ void UFlowSubsystem::FindComponents(const FGameplayTagContainer& Tags, const EGa
 		}
 	}
 }
+
+#undef LOCTEXT_NAMESPACE

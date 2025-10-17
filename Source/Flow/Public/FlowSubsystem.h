@@ -38,21 +38,23 @@ private:
 
 	/* All asset templates with active instances */
 	UPROPERTY()
-	TArray<UFlowAsset*> InstancedTemplates;
+		TArray<UFlowAsset*> InstancedTemplates;
 
 	/* Assets instanced by object from another system, i.e. World Settings or Player Controller */
 	UPROPERTY()
-	TMap<UFlowAsset*, TWeakObjectPtr<UObject>> RootInstances;
+		TMap<UFlowAsset*, TWeakObjectPtr<UObject>> RootInstances;
 
 	/* Assets instanced by Sub Graph nodes */
 	UPROPERTY()
-	TMap<UFlowNode_SubGraph*, UFlowAsset*> InstancedSubFlows;
+		TMap<UFlowNode_SubGraph*, UFlowAsset*> InstancedSubFlows;
 
 	FStreamableManager Streamable;
 
 protected:
 	UPROPERTY()
-	UFlowSaveGame* LoadedSaveGame;
+		FFlowSaveGameData LoadedSaveGame;
+
+	bool bSaveGameLoaded = false;
 
 public:
 	virtual bool ShouldCreateSubsystem(UObject* Outer) const override;
@@ -112,16 +114,21 @@ public:
 	FSimpleFlowEvent OnSaveGame;
 
 	UFUNCTION(BlueprintCallable, Category = "FlowSubsystem")
-	virtual void OnGameSaved(UFlowSaveGame* SaveGame);
+	virtual FFlowSaveGameData OnGameSaved();
 
 	UFUNCTION(BlueprintCallable, Category = "FlowSubsystem")
-	virtual void OnGameLoaded(UFlowSaveGame* SaveGame);
+	virtual void OnGameLoaded(FFlowSaveGameData SaveGame);
+
 
 	virtual void LoadRootFlow(UObject* Owner, UFlowAsset* FlowAsset, const FString& SavedAssetInstanceName);
 	virtual void LoadSubFlow(UFlowNode_SubGraph* SubGraphNode, const FString& SavedAssetInstanceName);
 
 	UFUNCTION(BlueprintPure, Category = "FlowSubsystem")
-	UFlowSaveGame* GetLoadedSaveGame() const { return LoadedSaveGame; }
+		FFlowSaveGameData& GetLoadedSaveGame() { return LoadedSaveGame; }
+
+	// TODO: There should probably be a function to clear LoadedSaveGame, since the player could back out of the game and then choose another save data, or start a new game.
+	UFUNCTION(BlueprintPure, Category = "FlowSubsystem")
+		bool IsSaveGameLoaded() { return bSaveGameLoaded; }
 
 //////////////////////////////////////////////////////////////////////////
 // Component Registry

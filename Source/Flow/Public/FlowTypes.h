@@ -3,8 +3,6 @@
 #pragma once
 
 #include "GameplayTagContainer.h"
-
-#include "FlowSave.h"
 #include "FlowTypes.generated.h"
 
 #if WITH_EDITORONLY_DATA
@@ -16,7 +14,9 @@ enum class EFlowNodeStyle : uint8
 	InOut UMETA(Hidden),
 	Latent,
 	Logic,
-	SubGraph UMETA(Hidden)
+	SubGraph UMETA(Hidden),
+	Development,
+	Custom
 };
 #endif
 
