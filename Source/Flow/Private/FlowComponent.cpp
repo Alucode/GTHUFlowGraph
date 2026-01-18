@@ -421,12 +421,20 @@ void UFlowComponent::SaveRootFlow(TArray<FFlowAssetSaveData>& SavedFlowInstances
 
 void UFlowComponent::LoadRootFlow()
 {
-	if (RootFlow && !SavedAssetInstanceName.IsEmpty() && GetFlowSubsystem())
+	if (RootFlow && GetFlowSubsystem())
 	{
-		VerifyIdentityTags();
+		if (!SavedAssetInstanceName.IsEmpty())
+		{
+			VerifyIdentityTags();
 
-		GetFlowSubsystem()->LoadRootFlow(this, RootFlow, SavedAssetInstanceName);
-		SavedAssetInstanceName = FString();
+			GetFlowSubsystem()->LoadRootFlow(this, RootFlow, SavedAssetInstanceName);
+			SavedAssetInstanceName = FString();
+		}
+		else if (bAutoStartRootFlow)
+		{
+			// No saved flow instance to restore - start fresh
+			StartRootFlow();
+		}
 	}
 }
 
