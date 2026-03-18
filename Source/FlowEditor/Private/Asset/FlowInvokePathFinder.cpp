@@ -4,6 +4,7 @@
 
 #include "FlowAsset.h"
 #include "Nodes/FlowNode.h"
+#include "Nodes/Route/FlowNode_InvokePoint.h"
 #include "Nodes/Route/FlowNode_Start.h"
 #include "Nodes/Route/FlowNode_SubGraph.h"
 
@@ -325,4 +326,51 @@ FGuid FFlowInvokePathFinder::FindStartNodeGuid(UFlowAsset* TemplateAsset)
 	}
 
 	return FGuid();
+}
+
+TArray<FFlowInvokePoint> FFlowInvokePathFinder::DiscoverInvokePoints(UFlowAsset* RootTemplateAsset)
+{
+	TArray<FFlowInvokePoint> Results;
+	if (!RootTemplateAsset) return Results;
+
+	// Use a queue of assets to visit (breadth-first across subgraph boundaries)
+	TArray<UFlowAsset*> AssetsToVisit;
+	TSet<UFlowAsset*> Visited;
+
+	AssetsToVisit.Add(RootTemplateAsset);
+
+	while (AssetsToVisit.Num() > 0)
+	{
+		UFlowAsset* Current = AssetsToVisit[0];
+		AssetsToVisit.RemoveAt(0);
+
+		if (!Current || Visited.Contains(Current)) continue;
+		Visited.Add(Current);
+
+		for (const TPair<FGuid, UFlowNode*>& NodePair : Current->GetNodes())
+		{
+			UFlowNode* Node = NodePair.Value;
+			if (!Node) continue;
+
+			if (UFlowNode_InvokePoint* InvokePoint = Cast<UFlowNode_InvokePoint>(Node))
+			{
+				FFlowInvokePoint Point;
+				Point.Name = InvokePoint->InvokeName.IsEmpty()
+					? FString::Printf(TEXT("(unnamed point)"))
+					: InvokePoint->InvokeName;
+				Point.Node = InvokePoint;
+				Point.TemplateAsset = Current;
+				Results.Add(Point);
+			}
+			else if (UFlowNode_SubGraph* SubGraph = Cast<UFlowNode_SubGraph>(Node))
+			{
+				if (UFlowAsset* ChildAsset = Cast<UFlowAsset>(SubGraph->GetAssetToEdit()))
+				{
+					AssetsToVisit.Add(ChildAsset);
+				}
+			}
+		}
+	}
+
+	return Results;
 }

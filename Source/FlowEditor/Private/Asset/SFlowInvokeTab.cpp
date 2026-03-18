@@ -6,6 +6,7 @@
 
 #include "FlowAsset.h"
 #include "Nodes/FlowNode.h"
+#include "Nodes/Route/FlowNode_InvokePoint.h"
 #include "Nodes/Route/FlowNode_SubGraph.h"
 
 #include "EditorStyleSet.h"
@@ -22,6 +23,7 @@ void SFlowInvokeTab::Construct(const FArguments& InArgs, FFlowAssetEditor* InEdi
 {
 	Editor = InEditor;
 
+	InvokePointsBox = SNew(SVerticalBox);
 	PathListBox = SNew(SVerticalBox);
 	BranchChoicesBox = SNew(SVerticalBox);
 	LogEntriesBox = SNew(SVerticalBox);
@@ -45,6 +47,40 @@ void SFlowInvokeTab::Construct(const FArguments& InArgs, FFlowAssetEditor* InEdi
 			+ SScrollBox::Slot()
 			[
 				SNew(SVerticalBox)
+
+				// --- Invoke Points ---
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(6.f, 6.f, 6.f, 2.f)
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot()
+					.FillWidth(1.f)
+					[
+						SNew(STextBlock)
+						.Text(LOCTEXT("InvokePointsLabel", "Invoke Points"))
+						.Font(FEditorStyle::GetFontStyle("DetailsView.CategoryFontStyle"))
+					]
+					+ SHorizontalBox::Slot()
+					.AutoWidth()
+					[
+						SNew(SButton)
+						.Text(LOCTEXT("ScanButton", "Scan"))
+						.OnClicked(this, &SFlowInvokeTab::OnScanClicked)
+					]
+				]
+
+				+ SVerticalBox::Slot()
+				.AutoHeight()
+				.Padding(6.f, 0.f, 6.f, 6.f)
+				[
+					SNew(SBorder)
+					.BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder"))
+					.Padding(FMargin(4.f, 4.f))
+					[
+						InvokePointsBox.ToSharedRef()
+					]
+				]
 
 				// --- Target Node ---
 				+ SVerticalBox::Slot()
@@ -172,7 +208,8 @@ void SFlowInvokeTab::Construct(const FArguments& InArgs, FFlowAssetEditor* InEdi
 		]
 	];
 
-	// Show empty-state path list
+	// Initial scan and empty-state displays
+	ScanInvokePoints();
 	RebuildPathDisplay();
 }
 
@@ -495,6 +532,62 @@ FReply SFlowInvokeTab::OnInvokeClicked()
 		}
 	}
 
+	return FReply::Handled();
+}
+
+void SFlowInvokeTab::ScanInvokePoints()
+{
+	UFlowAsset* RootAsset = Editor ? Editor->GetFlowAsset() : nullptr;
+	InvokePoints = FFlowInvokePathFinder::DiscoverInvokePoints(RootAsset);
+	RebuildInvokePoints();
+}
+
+void SFlowInvokeTab::RebuildInvokePoints()
+{
+	InvokePointsBox->ClearChildren();
+
+	if (InvokePoints.Num() == 0)
+	{
+		InvokePointsBox->AddSlot()
+		.AutoHeight()
+		[
+			SNew(STextBlock)
+			.Text(LOCTEXT("NoInvokePoints", "No Invoke Points found. Add FlowNode_InvokePoint nodes to your graph, then click Scan."))
+			.ColorAndOpacity(FLinearColor(0.5f, 0.5f, 0.5f))
+			.AutoWrapText(true)
+		];
+		return;
+	}
+
+	for (int32 i = 0; i < InvokePoints.Num(); i++)
+	{
+		const FFlowInvokePoint& Point = InvokePoints[i];
+		const bool bIsSelected = (Point.Node && Point.Node->GetGuid() == TargetNodeGuid);
+
+		InvokePointsBox->AddSlot()
+		.AutoHeight()
+		.Padding(2.f, 1.f)
+		[
+			SNew(SButton)
+			.Text(FText::FromString(Point.Name))
+			.ButtonColorAndOpacity(bIsSelected ? FLinearColor(0.15f, 0.35f, 0.15f) : FLinearColor(0.12f, 0.12f, 0.12f))
+			.HAlign(HAlign_Left)
+			.OnClicked_Lambda([this, i]() -> FReply
+			{
+				if (InvokePoints.IsValidIndex(i))
+				{
+					SetTargetNode(InvokePoints[i].Node);
+					RebuildInvokePoints(); // refresh selected highlight
+				}
+				return FReply::Handled();
+			})
+		];
+	}
+}
+
+FReply SFlowInvokeTab::OnScanClicked()
+{
+	ScanInvokePoints();
 	return FReply::Handled();
 }
 

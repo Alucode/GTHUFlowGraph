@@ -34,6 +34,9 @@ public:
 	/** Called by the editor when PIE state changes, to refresh button availability. */
 	void RefreshPIEState();
 
+	/** Re-scan the asset for FlowNode_InvokePoint nodes and rebuild the waypoint list. */
+	void ScanInvokePoints();
+
 private:
 	// --- Path state ---
 
@@ -50,8 +53,13 @@ private:
 
 	TArray<FString> LogEntries;
 
+	// --- Invoke points ---
+
+	TArray<FFlowInvokePoint> InvokePoints;
+
 	// --- Widget references ---
 
+	TSharedPtr<SVerticalBox> InvokePointsBox;
 	TSharedPtr<SVerticalBox> BranchChoicesBox;
 	TSharedPtr<SScrollBox> LogScrollBox;
 	TSharedPtr<SVerticalBox> LogEntriesBox;
@@ -63,6 +71,7 @@ private:
 
 	// --- Helpers ---
 
+	void RebuildInvokePoints();
 	void RebuildPathDisplay();
 	void RebuildBranchChoices();
 	void AddLogEntry(const FString& Entry);
@@ -75,4 +84,5 @@ private:
 	bool CanInvoke() const;
 	FReply OnInvokeClicked();
 	FReply OnClearLogClicked();
+	FReply OnScanClicked();
 };

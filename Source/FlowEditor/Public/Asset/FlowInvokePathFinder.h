@@ -9,6 +9,22 @@ class UFlowNode;
 class UFlowNode_SubGraph;
 
 /**
+ * A named invoke waypoint discovered in a FlowAsset tree.
+ * Populated by FFlowInvokePathFinder::DiscoverInvokePoints.
+ */
+struct FLOWEDITOR_API FFlowInvokePoint
+{
+	/** The human-readable name set on the FlowNode_InvokePoint. */
+	FString Name;
+
+	/** The node itself — pass directly to SFlowInvokeTab::SetTargetNode. */
+	UFlowNode* Node = nullptr;
+
+	/** The template asset that contains this node (may be a subgraph). */
+	UFlowAsset* TemplateAsset = nullptr;
+};
+
+/**
  * Represents a branch point where multiple predecessor nodes exist for a given node.
  * The user must choose which predecessor path to follow when invoking.
  */
@@ -131,6 +147,12 @@ public:
 
 	/** Get a display-friendly name for a node by GUID within a given asset. */
 	static FString GetNodeDisplayName(UFlowAsset* TemplateAsset, const FGuid& NodeGuid);
+
+	/**
+	 * Scan RootTemplateAsset and all nested subgraph assets for FlowNode_InvokePoint nodes.
+	 * Returns them in the order they are encountered (root first, then subgraphs depth-first).
+	 */
+	static TArray<FFlowInvokePoint> DiscoverInvokePoints(UFlowAsset* RootTemplateAsset);
 
 private:
 	/**
