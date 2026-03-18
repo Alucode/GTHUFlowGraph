@@ -307,6 +307,11 @@ public:
 	// Define what happens when node is terminated from the outside
 	virtual void ForceFinishNode();
 
+	// Called by the Invoke Tool when force-completing this node without executing it.
+	// Default: marks the node as Completed with no side effects.
+	// Override to apply meaningful world state (e.g. set quest variables, unlock doors).
+	virtual void InvokeNode();
+
 protected:
 	// Define what happens when node is terminated from the outside
 	UFUNCTION(BlueprintImplementableEvent, Category = "FlowNode", meta = (DisplayName = "Force Finish Node"))

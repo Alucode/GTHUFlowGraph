@@ -590,7 +590,7 @@ void UFlowAsset::InvokeToNode(const TArray<FGuid>& OrderedPath, TFunction<void(c
 		const FGuid& NodeGuid = OrderedPath[i];
 		if (UFlowNode* Node = Nodes.FindRef(NodeGuid))
 		{
-			Node->ActivationState = EFlowNodeState::Completed;
+			Node->InvokeNode();
 			RecordedNodes.AddUnique(Node);
 
 			if (OnNodeProcessed)
@@ -608,7 +608,11 @@ void UFlowAsset::InvokeToNode(const TArray<FGuid>& OrderedPath, TFunction<void(c
 	const FGuid& TargetGuid = OrderedPath.Last();
 	if (UFlowNode* TargetNode = Nodes.FindRef(TargetGuid))
 	{
-		TriggerInput(TargetGuid, UFlowNode::DefaultInputPin.PinName);
+		// Use the node's actual first input pin — some nodes (e.g. SubGraph) use "Start" not "In"
+		const FName InputPinName = (TargetNode->InputPins.Num() > 0)
+			? TargetNode->InputPins[0].PinName
+			: UFlowNode::DefaultInputPin.PinName;
+		TriggerInput(TargetGuid, InputPinName);
 
 		if (OnNodeProcessed)
 		{

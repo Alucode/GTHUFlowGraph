@@ -533,6 +533,11 @@ void UFlowNode::ForceFinishNode()
 	K2_ForceFinishNode();
 }
 
+void UFlowNode::InvokeNode()
+{
+	ActivationState = EFlowNodeState::Completed;
+}
+
 void UFlowNode::ResetRecords()
 {
 	ActivationState = EFlowNodeState::NeverActivated;

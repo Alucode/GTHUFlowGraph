@@ -6,6 +6,7 @@
 
 #include "FlowAsset.h"
 #include "Nodes/FlowNode.h"
+#include "Nodes/Route/FlowNode_SubGraph.h"
 
 #include "EditorStyleSet.h"
 #include "Widgets/Input/SButton.h"
@@ -194,19 +195,18 @@ void SFlowInvokeTab::SetTargetNode(UFlowNode* Node)
 	TargetNodeDisplayName = Node->GetClass()->GetName();
 #endif
 
-	// Find the template asset to run path finding on
-	UFlowAsset* TemplateAsset = nullptr;
-	if (Editor)
-	{
-		TemplateAsset = Editor->GetFlowAsset();
-	}
+	UFlowAsset* RootTemplateAsset = Editor ? Editor->GetFlowAsset() : nullptr;
+	CurrentPath = FFlowInvokePathFinder::FindPath(RootTemplateAsset, Node);
 
-	CurrentPath = FFlowInvokePathFinder::FindPath(TemplateAsset, TargetNodeGuid);
-
-	// If no pending choices, the path is already built
 	if (CurrentPath.IsComplete())
 	{
-		AddLogEntry(FString::Printf(TEXT("Path found: %d nodes to %s"), CurrentPath.OrderedNodes.Num(), *TargetNodeDisplayName));
+		int32 TotalNodes = 0;
+		for (const FFlowInvokePathSegment& Seg : CurrentPath.Segments)
+		{
+			TotalNodes += Seg.OrderedNodes.Num();
+		}
+		AddLogEntry(FString::Printf(TEXT("Path found: %d nodes across %d segment(s) to %s"),
+			TotalNodes, CurrentPath.Segments.Num(), *TargetNodeDisplayName));
 	}
 
 	RebuildPathDisplay();
@@ -251,22 +251,43 @@ void SFlowInvokeTab::RebuildPathDisplay()
 		return;
 	}
 
-	UFlowAsset* TemplateAsset = Editor ? Editor->GetFlowAsset() : nullptr;
-
-	for (int32 i = 0; i < CurrentPath.OrderedNodes.Num(); i++)
+	int32 GlobalIdx = 0;
+	for (int32 SegIdx = 0; SegIdx < CurrentPath.Segments.Num(); SegIdx++)
 	{
-		const FGuid& NodeGuid = CurrentPath.OrderedNodes[i];
-		const FString NodeName = FFlowInvokePathFinder::GetNodeDisplayName(TemplateAsset, NodeGuid);
-		const bool bIsTarget = (NodeGuid == CurrentPath.TargetNodeGuid);
+		const FFlowInvokePathSegment& Segment = CurrentPath.Segments[SegIdx];
 
-		PathListBox->AddSlot()
-		.AutoHeight()
-		.Padding(2.f, 1.f)
-		[
-			SNew(STextBlock)
-			.Text(FText::FromString(FString::Printf(TEXT("%d. %s%s"), i + 1, *NodeName, bIsTarget ? TEXT(" [TARGET]") : TEXT(""))))
-			.ColorAndOpacity(bIsTarget ? FLinearColor(0.4f, 1.f, 0.4f) : FLinearColor(0.8f, 0.8f, 0.8f))
-		];
+		// Show a segment header for subgraph levels
+		if (SegIdx > 0)
+		{
+			const FString SubGraphName = FFlowInvokePathFinder::GetNodeDisplayName(
+				CurrentPath.Segments[SegIdx - 1].TemplateAsset,
+				Segment.ParentSubGraphNodeGuid);
+
+			PathListBox->AddSlot()
+			.AutoHeight()
+			.Padding(2.f, 4.f, 2.f, 1.f)
+			[
+				SNew(STextBlock)
+				.Text(FText::FromString(FString::Printf(TEXT("  [ SubGraph: %s ]"), *SubGraphName)))
+				.ColorAndOpacity(FLinearColor(0.5f, 0.7f, 1.f))
+			];
+		}
+
+		for (int32 i = 0; i < Segment.OrderedNodes.Num(); i++)
+		{
+			const FGuid& NodeGuid = Segment.OrderedNodes[i];
+			const FString NodeName = FFlowInvokePathFinder::GetNodeDisplayName(Segment.TemplateAsset, NodeGuid);
+			const bool bIsTarget = (NodeGuid == CurrentPath.TargetNodeGuid);
+
+			PathListBox->AddSlot()
+			.AutoHeight()
+			.Padding(2.f, 1.f)
+			[
+				SNew(STextBlock)
+				.Text(FText::FromString(FString::Printf(TEXT("%d. %s%s"), ++GlobalIdx, *NodeName, bIsTarget ? TEXT(" [TARGET]") : TEXT(""))))
+				.ColorAndOpacity(bIsTarget ? FLinearColor(0.4f, 1.f, 0.4f) : FLinearColor(0.8f, 0.8f, 0.8f))
+			];
+		}
 	}
 }
 
@@ -274,9 +295,13 @@ void SFlowInvokeTab::RebuildBranchChoices()
 {
 	BranchChoicesBox->ClearChildren();
 
-	if (CurrentPath.PendingChoices.Num() == 0) return;
-
-	UFlowAsset* TemplateAsset = Editor ? Editor->GetFlowAsset() : nullptr;
+	// Count total choices across all segments
+	int32 TotalChoices = 0;
+	for (const FFlowInvokePathSegment& Seg : CurrentPath.Segments)
+	{
+		TotalChoices += Seg.PendingChoices.Num();
+	}
+	if (TotalChoices == 0) return;
 
 	BranchChoicesBox->AddSlot()
 	.AutoHeight()
@@ -288,56 +313,61 @@ void SFlowInvokeTab::RebuildBranchChoices()
 		.ColorAndOpacity(FLinearColor(0.9f, 0.7f, 0.2f))
 	];
 
-	for (int32 ChoiceIdx = 0; ChoiceIdx < CurrentPath.PendingChoices.Num(); ChoiceIdx++)
+	for (int32 SegIdx = 0; SegIdx < CurrentPath.Segments.Num(); SegIdx++)
 	{
-		FFlowBranchChoice& Choice = CurrentPath.PendingChoices[ChoiceIdx];
-		const FString ChoiceNodeName = FFlowInvokePathFinder::GetNodeDisplayName(TemplateAsset, Choice.NodeGuid);
+		FFlowInvokePathSegment& Segment = CurrentPath.Segments[SegIdx];
+		if (Segment.PendingChoices.Num() == 0) continue;
 
-		BranchChoicesBox->AddSlot()
-		.AutoHeight()
-		.Padding(6.f, 2.f, 6.f, 0.f)
-		[
-			SNew(STextBlock)
-			.Text(FText::FromString(FString::Printf(TEXT("Entering '%s' via:"), *ChoiceNodeName)))
-			.ColorAndOpacity(FLinearColor(0.7f, 0.7f, 0.7f))
-		];
-
-		for (int32 PredIdx = 0; PredIdx < Choice.AvailablePredecessors.Num(); PredIdx++)
+		for (int32 ChoiceIdx = 0; ChoiceIdx < Segment.PendingChoices.Num(); ChoiceIdx++)
 		{
-			const FGuid PredGuid = Choice.AvailablePredecessors[PredIdx];
-			const FString PredName = FFlowInvokePathFinder::GetNodeDisplayName(TemplateAsset, PredGuid);
-			const bool bSelected = (Choice.SelectedIndex == PredIdx);
-
-			// Capture by value for the lambda
-			const int32 CapturedChoiceIdx = ChoiceIdx;
-			const int32 CapturedPredIdx = PredIdx;
+			FFlowBranchChoice& Choice = Segment.PendingChoices[ChoiceIdx];
+			const FString ChoiceNodeName = FFlowInvokePathFinder::GetNodeDisplayName(Segment.TemplateAsset, Choice.NodeGuid);
 
 			BranchChoicesBox->AddSlot()
 			.AutoHeight()
-			.Padding(16.f, 1.f, 6.f, 1.f)
+			.Padding(6.f, 2.f, 6.f, 0.f)
 			[
-				SNew(SButton)
-				.Text(FText::FromString(FString::Printf(TEXT("%s %s"), bSelected ? TEXT("[x]") : TEXT("[ ]"), *PredName)))
-				.ButtonColorAndOpacity(bSelected ? FLinearColor(0.2f, 0.4f, 0.2f) : FLinearColor(0.15f, 0.15f, 0.15f))
-				.OnClicked_Lambda([this, CapturedChoiceIdx, CapturedPredIdx]() -> FReply
-				{
-					if (CurrentPath.PendingChoices.IsValidIndex(CapturedChoiceIdx))
-					{
-						CurrentPath.PendingChoices[CapturedChoiceIdx].SelectedIndex = CapturedPredIdx;
-
-						// If all choices are now resolved, build the ordered path
-						if (CurrentPath.AllChoicesResolved())
-						{
-							UFlowAsset* Asset = Editor ? Editor->GetFlowAsset() : nullptr;
-							FFlowInvokePathFinder::BuildOrderedPath(CurrentPath, Asset);
-						}
-
-						RebuildBranchChoices();
-						RebuildPathDisplay();
-					}
-					return FReply::Handled();
-				})
+				SNew(STextBlock)
+				.Text(FText::FromString(FString::Printf(TEXT("Entering '%s' via:"), *ChoiceNodeName)))
+				.ColorAndOpacity(FLinearColor(0.7f, 0.7f, 0.7f))
 			];
+
+			for (int32 PredIdx = 0; PredIdx < Choice.AvailablePredecessors.Num(); PredIdx++)
+			{
+				const FGuid PredGuid = Choice.AvailablePredecessors[PredIdx];
+				const FString PredName = FFlowInvokePathFinder::GetNodeDisplayName(Segment.TemplateAsset, PredGuid);
+				const bool bSelected = (Choice.SelectedIndex == PredIdx);
+
+				const int32 CapturedSegIdx = SegIdx;
+				const int32 CapturedChoiceIdx = ChoiceIdx;
+				const int32 CapturedPredIdx = PredIdx;
+
+				BranchChoicesBox->AddSlot()
+				.AutoHeight()
+				.Padding(16.f, 1.f, 6.f, 1.f)
+				[
+					SNew(SButton)
+					.Text(FText::FromString(FString::Printf(TEXT("%s %s"), bSelected ? TEXT("[x]") : TEXT("[ ]"), *PredName)))
+					.ButtonColorAndOpacity(bSelected ? FLinearColor(0.2f, 0.4f, 0.2f) : FLinearColor(0.15f, 0.15f, 0.15f))
+					.OnClicked_Lambda([this, CapturedSegIdx, CapturedChoiceIdx, CapturedPredIdx]() -> FReply
+					{
+						if (CurrentPath.Segments.IsValidIndex(CapturedSegIdx) &&
+							CurrentPath.Segments[CapturedSegIdx].PendingChoices.IsValidIndex(CapturedChoiceIdx))
+						{
+							CurrentPath.Segments[CapturedSegIdx].PendingChoices[CapturedChoiceIdx].SelectedIndex = CapturedPredIdx;
+
+							if (CurrentPath.AllChoicesResolved())
+							{
+								FFlowInvokePathFinder::BuildOrderedPath(CurrentPath);
+							}
+
+							RebuildBranchChoices();
+							RebuildPathDisplay();
+						}
+						return FReply::Handled();
+					})
+				];
+			}
 		}
 	}
 }
@@ -413,13 +443,57 @@ FReply SFlowInvokeTab::OnInvokeClicked()
 	}
 
 	ClearLog();
-	AddLogEntry(FString::Printf(TEXT("Invoking to: %s (%d nodes)"), *TargetNodeDisplayName, CurrentPath.OrderedNodes.Num()));
 
-	// Execute the invoke on the active instance
-	Instance->InvokeToNode(CurrentPath.OrderedNodes, [this](const FString& LogMsg)
+	int32 TotalNodes = 0;
+	for (const FFlowInvokePathSegment& Seg : CurrentPath.Segments)
 	{
-		AddLogEntry(LogMsg);
-	});
+		TotalNodes += Seg.OrderedNodes.Num();
+	}
+	AddLogEntry(FString::Printf(TEXT("Invoking to: %s (%d nodes, %d segment(s))"),
+		*TargetNodeDisplayName, TotalNodes, CurrentPath.Segments.Num()));
+
+	auto LogCallback = [this](const FString& LogMsg) { AddLogEntry(LogMsg); };
+
+	if (!CurrentPath.IsMultiSegment())
+	{
+		// Single-asset path — invoke directly on the root instance
+		Instance->InvokeToNode(CurrentPath.Segments[0].OrderedNodes, LogCallback);
+	}
+	else
+	{
+		// Multi-segment path — invoke per level, descending into each subgraph instance
+		UFlowAsset* CurrentInstance = Instance;
+		for (int32 i = 0; i < CurrentPath.Segments.Num(); i++)
+		{
+			const FFlowInvokePathSegment& Segment = CurrentPath.Segments[i];
+			const bool bIsLast = (i == CurrentPath.Segments.Num() - 1);
+
+			CurrentInstance->InvokeToNode(Segment.OrderedNodes, LogCallback);
+
+			if (!bIsLast)
+			{
+				// The last node in this segment is the SubGraph boundary node, now activated.
+				// Retrieve the child instance it created.
+				const FGuid SubGraphGuid = Segment.OrderedNodes.Last();
+				UFlowNode_SubGraph* SubGraphNode = CurrentInstance->GetNode<UFlowNode_SubGraph>(SubGraphGuid);
+				if (!SubGraphNode)
+				{
+					AddLogEntry(TEXT("ERROR: SubGraph boundary node not found on instance."));
+					break;
+				}
+
+				UFlowAsset* ChildInstance = CurrentInstance->GetFlowInstance(SubGraphNode).Get();
+				if (!ChildInstance)
+				{
+					AddLogEntry(TEXT("ERROR: SubGraph child instance was not created. "
+						"Ensure the subgraph has at least one async node after its Start."));
+					break;
+				}
+
+				CurrentInstance = ChildInstance;
+			}
+		}
+	}
 
 	return FReply::Handled();
 }

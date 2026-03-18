@@ -6,6 +6,7 @@
 
 class UFlowAsset;
 class UFlowNode;
+class UFlowNode_SubGraph;
 
 /**
  * Represents a branch point where multiple predecessor nodes exist for a given node.
@@ -27,21 +28,32 @@ struct FLOWEDITOR_API FFlowBranchChoice
 };
 
 /**
- * The result of path finding from the Start node to a target node.
- * May contain PendingChoices if branching is encountered.
+ * One level of a potentially multi-level invoke path.
+ * Represents execution through a single FlowAsset from its Start node to either
+ * the final target node (last segment) or a SubGraph boundary node (intermediate segments).
  */
-struct FLOWEDITOR_API FFlowInvokePath
+struct FLOWEDITOR_API FFlowInvokePathSegment
 {
-	/** Ordered node GUIDs from Start to Target (inclusive). Populated after all choices are resolved. */
+	/** Template asset for this segment. */
+	UFlowAsset* TemplateAsset = nullptr;
+
+	/**
+	 * GUID of the SubGraph node in the parent asset that creates this asset's instance.
+	 * Invalid for the root segment (index 0).
+	 */
+	FGuid ParentSubGraphNodeGuid;
+
+	/**
+	 * The target within this segment: for intermediate segments, the SubGraph boundary node GUID;
+	 * for the last segment, the user's chosen target node GUID.
+	 */
+	FGuid SegmentTargetGuid;
+
+	/** Ordered node GUIDs from Start to SegmentTargetGuid (inclusive). Populated after choices are resolved. */
 	TArray<FGuid> OrderedNodes;
 
-	/** Branch choices that require user resolution before the path can be built. */
+	/** Branch choices requiring user resolution within this segment's asset. */
 	TArray<FFlowBranchChoice> PendingChoices;
-
-	/** The target node this path leads to. */
-	FGuid TargetNodeGuid;
-
-	bool HasTarget() const { return TargetNodeGuid.IsValid(); }
 
 	bool AllChoicesResolved() const
 	{
@@ -51,34 +63,95 @@ struct FLOWEDITOR_API FFlowInvokePath
 		}
 		return true;
 	}
-
-	bool IsComplete() const { return HasTarget() && AllChoicesResolved() && OrderedNodes.Num() > 0; }
 };
 
 /**
- * Finds execution paths through a FlowAsset graph from the Start node to a target node.
+ * The result of path finding from a root asset's Start node to a target node,
+ * potentially spanning multiple nested FlowAssets via SubGraph nodes.
+ */
+struct FLOWEDITOR_API FFlowInvokePath
+{
+	/**
+	 * Path segments ordered from root (index 0) to the asset containing the target (last index).
+	 * Single-asset paths have exactly one segment.
+	 * Multi-asset paths have one segment per nesting level; intermediate segments end at
+	 * the SubGraph boundary node that leads into the next segment.
+	 */
+	TArray<FFlowInvokePathSegment> Segments;
+
+	/** The target node GUID, located within the last segment's asset. */
+	FGuid TargetNodeGuid;
+
+	bool HasTarget() const { return TargetNodeGuid.IsValid() && Segments.Num() > 0; }
+
+	bool AllChoicesResolved() const
+	{
+		for (const FFlowInvokePathSegment& Segment : Segments)
+		{
+			if (!Segment.AllChoicesResolved()) return false;
+		}
+		return true;
+	}
+
+	bool IsComplete() const
+	{
+		if (!HasTarget() || !AllChoicesResolved()) return false;
+		for (const FFlowInvokePathSegment& Segment : Segments)
+		{
+			if (Segment.OrderedNodes.Num() == 0) return false;
+		}
+		return true;
+	}
+
+	bool IsMultiSegment() const { return Segments.Num() > 1; }
+};
+
+/**
+ * Finds execution paths through FlowAsset graphs from the Start node to a target node,
+ * including descent into nested SubGraph assets.
  * Used by the Invoke Tool to determine which nodes to force-complete during invocation.
  */
 class FLOWEDITOR_API FFlowInvokePathFinder
 {
 public:
 	/**
-	 * Find the path from the Start node to TargetNodeGuid.
+	 * Find the path from RootTemplateAsset's Start node to TargetNode.
+	 * If TargetNode lives inside a subgraph, produces a multi-segment path that descends
+	 * through SubGraph boundary nodes to reach the target asset.
 	 * Returns a path that may have PendingChoices if branching is encountered.
-	 * After resolving all choices, call BuildOrderedPath() to populate OrderedNodes.
+	 * After resolving all choices, call BuildOrderedPath() to populate each segment's OrderedNodes.
 	 */
-	static FFlowInvokePath FindPath(UFlowAsset* TemplateAsset, const FGuid& TargetNodeGuid);
+	static FFlowInvokePath FindPath(UFlowAsset* RootTemplateAsset, UFlowNode* TargetNode);
 
 	/**
-	 * After all PendingChoices have been resolved, build the final ordered node sequence.
-	 * Populates InOutPath.OrderedNodes. No-op if choices are unresolved.
+	 * After all PendingChoices in all segments have been resolved, build each segment's
+	 * OrderedNodes. Skips segments that are already built. No-op if any choices remain unresolved.
 	 */
-	static void BuildOrderedPath(FFlowInvokePath& InOutPath, UFlowAsset* TemplateAsset);
+	static void BuildOrderedPath(FFlowInvokePath& InOutPath);
 
-	/** Get a display-friendly name for a node by GUID (for use in branch choice UI). */
+	/** Get a display-friendly name for a node by GUID within a given asset. */
 	static FString GetNodeDisplayName(UFlowAsset* TemplateAsset, const FGuid& NodeGuid);
 
 private:
-	/** Build a map from node GUID to array of predecessor node GUIDs (reverse of Connections). */
+	/**
+	 * Find the chain of SubGraph nodes leading from CurrentAsset down to TargetAsset.
+	 * OutChain is ordered outermost-to-innermost. Returns false if no path is found.
+	 */
+	static bool FindSubGraphChain(UFlowAsset* CurrentAsset, UFlowAsset* TargetAsset, TArray<UFlowNode_SubGraph*>& OutChain);
+
+	/**
+	 * Build a single path segment via BFS backward from TargetGuid to Start within TemplateAsset.
+	 * Fills PendingChoices. If no choices exist, also populates OrderedNodes immediately.
+	 * An invalid SegmentTargetGuid on the returned segment indicates no path was found.
+	 */
+	static FFlowInvokePathSegment BuildSegment(UFlowAsset* TemplateAsset, const FGuid& TargetGuid, const FGuid& ParentSubGraphNodeGuid);
+
+	/** Populate OrderedNodes for a single segment after its choices are resolved. */
+	static void BuildOrderedSegment(FFlowInvokePathSegment& Segment);
+
+	/** Build a reverse connection map within an asset: node GUID → predecessor GUIDs. */
 	static TMap<FGuid, TArray<FGuid>> BuildReverseMap(UFlowAsset* TemplateAsset);
+
+	/** Find the Start node GUID within an asset. Returns an invalid GUID if not found. */
+	static FGuid FindStartNodeGuid(UFlowAsset* TemplateAsset);
 };
