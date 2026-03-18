@@ -11,9 +11,11 @@
 
 #include "FlowTypes.h"
 
+class SFlowInvokeTab;
 class SFlowPalette;
 class UFlowAsset;
 class UFlowGraphNode;
+class UFlowNode;
 
 class IDetailsView;
 class SDockableTab;
@@ -35,12 +37,14 @@ protected:
 	TSharedPtr<SGraphEditor> FocusedGraphEditor;
 	TSharedPtr<class IDetailsView> DetailsView;
 	TSharedPtr<class SFlowPalette> Palette;
+	TSharedPtr<class SFlowInvokeTab> InvokeTabWidget;
 
 public:
 	/**	The tab ids for all the tabs used */
 	static const FName DetailsTab;
 	static const FName GraphTab;
 	static const FName PaletteTab;
+	static const FName InvokeTab;
 
 private:
 	/** The current UI selection state of this editor */
@@ -85,6 +89,11 @@ private:
 	TSharedRef<SDockTab> SpawnTab_Details(const FSpawnTabArgs& Args) const;
 	TSharedRef<SDockTab> SpawnTab_GraphCanvas(const FSpawnTabArgs& Args) const;
 	TSharedRef<SDockTab> SpawnTab_Palette(const FSpawnTabArgs& Args) const;
+	TSharedRef<SDockTab> SpawnTab_Invoke(const FSpawnTabArgs& Args) const;
+
+public:
+	/** Called by the graph node context menu to set the invoke target. */
+	void SetInvokeTargetNode(UFlowNode* Node);
 
 public:
 	/** Edits the specified FlowAsset object */
@@ -218,4 +227,7 @@ private:
 
 	void JumpToNodeDefinition() const;
 	bool CanJumpToNodeDefinition() const;
+
+	void OnSetInvokeTarget();
+	bool CanSetInvokeTarget() const;
 };

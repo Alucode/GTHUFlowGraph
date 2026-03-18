@@ -292,7 +292,20 @@ protected:
 	UFUNCTION(BlueprintNativeEvent, Category = "SaveGame")
 	void OnLoad();
 
-public:	
+public:
 	UFUNCTION(BlueprintNativeEvent, Category = "SaveGame")
 	bool IsBoundToWorld();
+
+//////////////////////////////////////////////////////////////////////////
+// Invoke Tool (Editor Development Tool)
+
+public:
+	/**
+	 * Force-completes all nodes in OrderedPath (except the last) without executing them,
+	 * then activates the last node normally. Used by the Flow Invoke Tool for rapid iteration.
+	 *
+	 * @param OrderedPath   Node GUIDs in execution order, Start first, Target last.
+	 * @param OnNodeProcessed  Optional callback invoked with a log string for each node processed.
+	 */
+	void InvokeToNode(const TArray<FGuid>& OrderedPath, TFunction<void(const FString&)> OnNodeProcessed = nullptr);
 };

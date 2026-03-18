@@ -49,6 +49,9 @@ public:
 	TSharedPtr<FUICommandInfo> FocusViewport;
 	TSharedPtr<FUICommandInfo> JumpToNodeDefinition;
 
+	/** Invoke Tool */
+	TSharedPtr<FUICommandInfo> SetInvokeTarget;
+
 	virtual void RegisterCommands() override;
 };
 

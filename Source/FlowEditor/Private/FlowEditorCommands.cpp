@@ -49,6 +49,8 @@ void FFlowGraphCommands::RegisterCommands()
 
 	UI_COMMAND(FocusViewport, "Focus Viewport", "Focus viewport on actor assigned to the node", EUserInterfaceActionType::Button, FInputChord());
 	UI_COMMAND(JumpToNodeDefinition, "Jump to Node Definition", "Jump to the node definition", EUserInterfaceActionType::Button, FInputChord());
+
+	UI_COMMAND(SetInvokeTarget, "Set as Invoke Target", "Set this node as the target for the Flow Invoke Tool", EUserInterfaceActionType::Button, FInputChord());
 }
 
 FFlowSpawnNodeCommands::FFlowSpawnNodeCommands()

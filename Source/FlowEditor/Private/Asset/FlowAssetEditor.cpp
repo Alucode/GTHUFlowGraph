@@ -4,6 +4,7 @@
 
 #include "Asset/FlowAssetToolbar.h"
 #include "Asset/FlowDebugger.h"
+#include "Asset/SFlowInvokeTab.h"
 #include "FlowEditorCommands.h"
 #include "Graph/FlowGraph.h"
 #include "Graph/FlowGraphEditorSettings.h"
@@ -40,6 +41,7 @@
 const FName FFlowAssetEditor::DetailsTab(TEXT("Details"));
 const FName FFlowAssetEditor::GraphTab(TEXT("Graph"));
 const FName FFlowAssetEditor::PaletteTab(TEXT("Palette"));
+const FName FFlowAssetEditor::InvokeTab(TEXT("Invoke"));
 
 FFlowAssetEditor::FFlowAssetEditor()
 	: FlowAsset(nullptr)
@@ -122,6 +124,11 @@ void FFlowAssetEditor::RegisterTabSpawners(const TSharedRef<class FTabManager>& 
 				.SetDisplayName(LOCTEXT("PaletteTab", "Palette"))
 				.SetGroup(WorkspaceMenuCategoryRef)
 				.SetIcon(FSlateIcon(FEditorStyle::GetStyleSetName(), "Kismet.Tabs.Palette"));
+
+	InTabManager->RegisterTabSpawner(InvokeTab, FOnSpawnTab::CreateSP(this, &FFlowAssetEditor::SpawnTab_Invoke))
+				.SetDisplayName(LOCTEXT("InvokeTab", "Invoke Tool"))
+				.SetGroup(WorkspaceMenuCategoryRef)
+				.SetIcon(FSlateIcon(FEditorStyle::GetStyleSetName(), "GraphEditor.Event_16x"));
 }
 
 void FFlowAssetEditor::UnregisterTabSpawners(const TSharedRef<class FTabManager>& InTabManager)
@@ -131,6 +138,7 @@ void FFlowAssetEditor::UnregisterTabSpawners(const TSharedRef<class FTabManager>
 	InTabManager->UnregisterTabSpawner(GraphTab);
 	InTabManager->UnregisterTabSpawner(DetailsTab);
 	InTabManager->UnregisterTabSpawner(PaletteTab);
+	InTabManager->UnregisterTabSpawner(InvokeTab);
 }
 
 TSharedRef<SDockTab> FFlowAssetEditor::SpawnTab_Details(const FSpawnTabArgs& Args) const
@@ -172,6 +180,18 @@ TSharedRef<SDockTab> FFlowAssetEditor::SpawnTab_Palette(const FSpawnTabArgs& Arg
 	];
 }
 
+TSharedRef<SDockTab> FFlowAssetEditor::SpawnTab_Invoke(const FSpawnTabArgs& Args) const
+{
+	check(Args.GetTabId() == InvokeTab);
+
+	return SNew(SDockTab)
+		.Icon(FEditorStyle::GetBrush("GraphEditor.Event_16x"))
+		.Label(LOCTEXT("FlowInvokeTitle", "Invoke Tool"))
+	[
+		InvokeTabWidget.ToSharedRef()
+	];
+}
+
 void FFlowAssetEditor::InitFlowAssetEditor(const EToolkitMode::Type Mode, const TSharedPtr<class IToolkitHost>& InitToolkitHost, UObject* ObjectToEdit)
 {
 	FlowAsset = CastChecked<UFlowAsset>(ObjectToEdit);
@@ -189,7 +209,7 @@ void FFlowAssetEditor::InitFlowAssetEditor(const EToolkitMode::Type Mode, const 
 	BindGraphCommands();
 	CreateWidgets();
 
-	const TSharedRef<FTabManager::FLayout> StandaloneDefaultLayout = FTabManager::NewLayout("FlowAssetEditor_Layout_v2")
+	const TSharedRef<FTabManager::FLayout> StandaloneDefaultLayout = FTabManager::NewLayout("FlowAssetEditor_Layout_v3")
 		->AddArea
 		(
 			FTabManager::NewPrimaryArea()->SetOrientation(Orient_Vertical)
@@ -207,6 +227,7 @@ void FFlowAssetEditor::InitFlowAssetEditor(const EToolkitMode::Type Mode, const 
 								FTabManager::NewStack()
 								->SetSizeCoefficient(0.225f)
 								->AddTab(DetailsTab, ETabState::OpenedTab)
+								->AddTab(InvokeTab, ETabState::OpenedTab)
 							)
 							->Split
 							(
@@ -309,6 +330,7 @@ void FFlowAssetEditor::CreateWidgets()
 	DetailsView->SetObject(FlowAsset);
 
 	Palette = SNew(SFlowPalette, SharedThis(this));
+	InvokeTabWidget = SNew(SFlowInvokeTab, this);
 }
 
 TSharedRef<SGraphEditor> FFlowAssetEditor::CreateGraphWidget()
@@ -524,6 +546,11 @@ void FFlowAssetEditor::BindGraphCommands()
 	ToolkitCommands->MapAction(FlowGraphCommands.JumpToNodeDefinition,
         FExecuteAction::CreateSP(this, &FFlowAssetEditor::JumpToNodeDefinition),
         FCanExecuteAction::CreateSP(this, &FFlowAssetEditor::CanJumpToNodeDefinition));
+
+	// Invoke Tool
+	ToolkitCommands->MapAction(FlowGraphCommands.SetInvokeTarget,
+		FExecuteAction::CreateSP(this, &FFlowAssetEditor::OnSetInvokeTarget),
+		FCanExecuteAction::CreateSP(this, &FFlowAssetEditor::CanSetInvokeTarget));
 }
 
 void FFlowAssetEditor::UndoGraphAction()
@@ -1354,6 +1381,31 @@ void FFlowAssetEditor::JumpToNodeDefinition() const
 bool FFlowAssetEditor::CanJumpToNodeDefinition() const
 {
 	return GetSelectedFlowNodes().Num() == 1;
+}
+
+void FFlowAssetEditor::OnSetInvokeTarget()
+{
+	for (const UFlowGraphNode* SelectedNode : GetSelectedFlowNodes())
+	{
+		if (UFlowNode* FlowNode = SelectedNode->GetFlowNode())
+		{
+			SetInvokeTargetNode(FlowNode);
+		}
+		return;
+	}
+}
+
+bool FFlowAssetEditor::CanSetInvokeTarget() const
+{
+	return GetSelectedFlowNodes().Num() == 1;
+}
+
+void FFlowAssetEditor::SetInvokeTargetNode(UFlowNode* Node)
+{
+	if (InvokeTabWidget.IsValid())
+	{
+		InvokeTabWidget->SetTargetNode(Node);
+	}
 }
 
 #undef LOCTEXT_NAMESPACE

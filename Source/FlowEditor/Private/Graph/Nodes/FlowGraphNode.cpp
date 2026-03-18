@@ -551,6 +551,11 @@ void UFlowGraphNode::GetNodeContextMenuActions(class UToolMenu* Menu, class UGra
 				Section.AddMenuEntry(FlowGraphCommands.JumpToNodeDefinition);
 			}
 		}
+
+		{
+			FToolMenuSection& Section = Menu->AddSection("FlowGraphNodeInvoke", LOCTEXT("InvokeToolMenuHeader", "Invoke Tool"));
+			Section.AddMenuEntry(FlowGraphCommands.SetInvokeTarget);
+		}
 	}
 }
 

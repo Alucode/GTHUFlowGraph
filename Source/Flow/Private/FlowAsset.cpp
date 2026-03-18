@@ -561,3 +561,50 @@ bool UFlowAsset::IsBoundToWorld_Implementation()
 {
 	return bWorldBound;
 }
+
+void UFlowAsset::InvokeToNode(const TArray<FGuid>& OrderedPath, TFunction<void(const FString&)> OnNodeProcessed)
+{
+	if (OrderedPath.Num() == 0) return;
+
+	// Reset current graph state so we start clean
+	ResetNodes();
+	ActiveNodes.Empty();
+
+	// Force-complete all nodes in the path except the last one.
+	// We set their state directly without calling ExecuteInput, so no side effects fire.
+	// The target node (last in path) is activated normally.
+	for (int32 i = 0; i < OrderedPath.Num() - 1; i++)
+	{
+		const FGuid& NodeGuid = OrderedPath[i];
+		if (UFlowNode* Node = Nodes.FindRef(NodeGuid))
+		{
+			Node->ActivationState = EFlowNodeState::Completed;
+			RecordedNodes.AddUnique(Node);
+
+			if (OnNodeProcessed)
+			{
+#if WITH_EDITOR
+				OnNodeProcessed(FString::Printf(TEXT("Force-completed: %s"), *Node->GetNodeTitle().ToString()));
+#else
+				OnNodeProcessed(FString::Printf(TEXT("Force-completed: %s"), *Node->GetClass()->GetName()));
+#endif
+			}
+		}
+	}
+
+	// Activate the target node (last in path) through the normal execution path
+	const FGuid& TargetGuid = OrderedPath.Last();
+	if (UFlowNode* TargetNode = Nodes.FindRef(TargetGuid))
+	{
+		TriggerInput(TargetGuid, UFlowNode::DefaultInputPin.PinName);
+
+		if (OnNodeProcessed)
+		{
+#if WITH_EDITOR
+			OnNodeProcessed(FString::Printf(TEXT("Activated: %s"), *TargetNode->GetNodeTitle().ToString()));
+#else
+			OnNodeProcessed(FString::Printf(TEXT("Activated: %s"), *TargetNode->GetClass()->GetName()));
+#endif
+		}
+	}
+}
