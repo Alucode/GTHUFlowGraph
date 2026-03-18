@@ -11,7 +11,6 @@
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/Layout/SSeparator.h"
-#include "Widgets/Layout/SSplitter.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/SBoxPanel.h"
@@ -34,12 +33,11 @@ void SFlowInvokeTab::Construct(const FArguments& InArgs, FFlowAssetEditor* InEdi
 
 	ChildSlot
 	[
-		SNew(SSplitter)
-		.Orientation(Orient_Vertical)
+		SNew(SVerticalBox)
 
 		// --- Top pane: controls (scrollable) ---
-		+ SSplitter::Slot()
-		.Value(0.6f)
+		+ SVerticalBox::Slot()
+		.FillHeight(0.6f)
 		[
 			SNew(SScrollBox)
 
@@ -116,9 +114,24 @@ void SFlowInvokeTab::Construct(const FArguments& InArgs, FFlowAssetEditor* InEdi
 			]
 		]
 
+		// --- Visible divider ---
+		+ SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(0.f, 2.f)
+		[
+			SNew(SBorder)
+			.BorderBackgroundColor(FLinearColor(0.08f, 0.08f, 0.08f, 1.f))
+			.Padding(FMargin(0.f, 1.f))
+			[
+				SNew(SBorder)
+				.BorderBackgroundColor(FLinearColor(0.4f, 0.4f, 0.4f, 1.f))
+				.Padding(FMargin(0.f, 1.f))
+			]
+		]
+
 		// --- Bottom pane: log (scrollable) ---
-		+ SSplitter::Slot()
-		.Value(0.4f)
+		+ SVerticalBox::Slot()
+		.FillHeight(0.4f)
 		[
 			SNew(SVerticalBox)
 

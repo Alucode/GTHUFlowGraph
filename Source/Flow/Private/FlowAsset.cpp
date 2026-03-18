@@ -566,9 +566,21 @@ void UFlowAsset::InvokeToNode(const TArray<FGuid>& OrderedPath, TFunction<void(c
 {
 	if (OrderedPath.Num() == 0) return;
 
-	// Reset current graph state so we start clean
-	ResetNodes();
+	// Properly deactivate all currently running nodes so their cleanup fires
+	// (stops audio, cancels timers, etc.) before we wipe the graph state.
+	// We empty ActiveNodes first so re-entrant FinishNode calls are no-ops.
+	TArray<UFlowNode*> CurrentlyActive = ActiveNodes;
 	ActiveNodes.Empty();
+	for (UFlowNode* Node : CurrentlyActive)
+	{
+		if (Node)
+		{
+			Node->Deactivate();
+		}
+	}
+
+	// Reset recorded node history
+	ResetNodes();
 
 	// Force-complete all nodes in the path except the last one.
 	// We set their state directly without calling ExecuteInput, so no side effects fire.
