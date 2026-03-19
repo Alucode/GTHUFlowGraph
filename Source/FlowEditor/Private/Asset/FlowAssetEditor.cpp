@@ -551,6 +551,10 @@ void FFlowAssetEditor::BindGraphCommands()
 	ToolkitCommands->MapAction(FlowGraphCommands.SetInvokeTarget,
 		FExecuteAction::CreateSP(this, &FFlowAssetEditor::OnSetInvokeTarget),
 		FCanExecuteAction::CreateSP(this, &FFlowAssetEditor::CanSetInvokeTarget));
+
+	ToolkitCommands->MapAction(FlowGraphCommands.ForceCompleteNode,
+		FExecuteAction::CreateSP(this, &FFlowAssetEditor::OnForceCompleteNode),
+		FCanExecuteAction::CreateSP(this, &FFlowAssetEditor::CanForceCompleteNode));
 }
 
 void FFlowAssetEditor::UndoGraphAction()
@@ -1406,6 +1410,36 @@ void FFlowAssetEditor::SetInvokeTargetNode(UFlowNode* Node)
 	{
 		InvokeTabWidget->SetTargetNode(Node);
 	}
+}
+
+void FFlowAssetEditor::OnForceCompleteNode()
+{
+	for (const UFlowGraphNode* SelectedNode : GetSelectedFlowNodes())
+	{
+		if (UFlowNode* NodeInstance = SelectedNode->GetInspectedNodeInstance())
+		{
+			NodeInstance->ForceFinishNode();
+		}
+		return;
+	}
+}
+
+bool FFlowAssetEditor::CanForceCompleteNode() const
+{
+	if (!IsPIE() || GetSelectedFlowNodes().Num() != 1)
+	{
+		return false;
+	}
+
+	for (const UFlowGraphNode* SelectedNode : GetSelectedFlowNodes())
+	{
+		if (const UFlowNode* NodeInstance = SelectedNode->GetInspectedNodeInstance())
+		{
+			return NodeInstance->GetActivationState() == EFlowNodeState::Active;
+		}
+	}
+
+	return false;
 }
 
 #undef LOCTEXT_NAMESPACE

@@ -51,6 +51,7 @@ public:
 
 	/** Invoke Tool */
 	TSharedPtr<FUICommandInfo> SetInvokeTarget;
+	TSharedPtr<FUICommandInfo> ForceCompleteNode;
 
 	virtual void RegisterCommands() override;
 };

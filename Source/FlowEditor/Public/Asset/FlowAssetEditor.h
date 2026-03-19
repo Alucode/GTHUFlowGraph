@@ -230,4 +230,7 @@ private:
 
 	void OnSetInvokeTarget();
 	bool CanSetInvokeTarget() const;
+
+	void OnForceCompleteNode();
+	bool CanForceCompleteNode() const;
 };
