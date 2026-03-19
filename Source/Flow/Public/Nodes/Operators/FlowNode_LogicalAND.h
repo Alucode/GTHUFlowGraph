@@ -25,5 +25,6 @@ public:
 
 protected:
 	virtual void ExecuteInput(const FName& PinName) override;
+	virtual void InvokeNode() override;
 	virtual void Cleanup() override;
 };

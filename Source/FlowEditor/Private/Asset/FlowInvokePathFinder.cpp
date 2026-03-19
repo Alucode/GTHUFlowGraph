@@ -4,6 +4,7 @@
 
 #include "FlowAsset.h"
 #include "Nodes/FlowNode.h"
+#include "Nodes/Operators/FlowNode_LogicalAND.h"
 #include "Nodes/Route/FlowNode_InvokePoint.h"
 #include "Nodes/Route/FlowNode_Start.h"
 #include "Nodes/Route/FlowNode_SubGraph.h"
@@ -205,10 +206,17 @@ FFlowInvokePathSegment FFlowInvokePathFinder::BuildSegment(UFlowAsset* TemplateA
 
 		if (Predecessors->Num() > 1)
 		{
-			FFlowBranchChoice Choice;
-			Choice.NodeGuid = Current;
-			Choice.AvailablePredecessors = *Predecessors;
-			Segment.PendingChoices.Add(Choice);
+			// AND (join) nodes require all predecessors — no user choice needed
+			const UFlowNode* CurrentNode = TemplateAsset->GetNode(Current);
+			const bool bIsJoin = CurrentNode && CurrentNode->IsA<UFlowNode_LogicalAND>();
+
+			if (!bIsJoin)
+			{
+				FFlowBranchChoice Choice;
+				Choice.NodeGuid = Current;
+				Choice.AvailablePredecessors = *Predecessors;
+				Segment.PendingChoices.Add(Choice);
+			}
 		}
 
 		for (const FGuid& Pred : *Predecessors)
@@ -250,7 +258,7 @@ void FFlowInvokePathFinder::BuildOrderedSegment(FFlowInvokePathSegment& Segment)
 	const FGuid StartGuid = FindStartNodeGuid(Segment.TemplateAsset);
 	if (!StartGuid.IsValid()) return;
 
-	// Build a map of chosen predecessors: node → which predecessor to use
+	// Build chosen predecessor map for branch nodes (single-predecessor and resolved choices)
 	TMap<FGuid, FGuid> ChosenPredecessorMap;
 	for (const TPair<FGuid, TArray<FGuid>>& Entry : ReverseMap)
 	{
@@ -267,26 +275,52 @@ void FFlowInvokePathFinder::BuildOrderedSegment(FFlowInvokePathSegment& Segment)
 		}
 	}
 
-	// Walk backwards from SegmentTargetGuid to Start following chosen predecessors
-	TArray<FGuid> ReversePath;
-	FGuid Current = Segment.SegmentTargetGuid;
+	// BFS backward from target collecting all required ancestors.
+	// Branch nodes follow their chosen predecessor; AND (join) nodes follow all predecessors.
+	TSet<FGuid> Visited;
+	TArray<FGuid> BFSOrder;
+	TArray<FGuid> Queue;
 
-	constexpr int32 MaxIterations = 1024;
-	int32 Iterations = 0;
+	Queue.Add(Segment.SegmentTargetGuid);
 
-	while (Current.IsValid() && Iterations++ < MaxIterations)
+	while (Queue.Num() > 0)
 	{
-		ReversePath.Add(Current);
-		if (Current == StartGuid) break;
+		const FGuid Current = Queue[0];
+		Queue.RemoveAt(0);
 
-		const FGuid* Chosen = ChosenPredecessorMap.Find(Current);
-		Current = Chosen ? *Chosen : FGuid();
+		if (Visited.Contains(Current)) continue;
+		Visited.Add(Current);
+		BFSOrder.Add(Current);
+
+		const TArray<FGuid>* Predecessors = ReverseMap.Find(Current);
+		if (!Predecessors) continue;
+
+		const UFlowNode* CurrentNode = Segment.TemplateAsset->GetNode(Current);
+		const bool bIsJoin = CurrentNode && CurrentNode->IsA<UFlowNode_LogicalAND>();
+
+		if (bIsJoin)
+		{
+			// Join node: all predecessors are required
+			for (const FGuid& Pred : *Predecessors)
+			{
+				Queue.Add(Pred);
+			}
+		}
+		else
+		{
+			// Branch or single-predecessor node: follow chosen predecessor only
+			const FGuid* Chosen = ChosenPredecessorMap.Find(Current);
+			if (Chosen)
+			{
+				Queue.Add(*Chosen);
+			}
+		}
 	}
 
-	// Reverse to get Start → Target order
-	for (int32 i = ReversePath.Num() - 1; i >= 0; i--)
+	// BFSOrder is target-first; reverse to get Start → Target order
+	for (int32 i = BFSOrder.Num() - 1; i >= 0; i--)
 	{
-		Segment.OrderedNodes.Add(ReversePath[i]);
+		Segment.OrderedNodes.Add(BFSOrder[i]);
 	}
 }
 

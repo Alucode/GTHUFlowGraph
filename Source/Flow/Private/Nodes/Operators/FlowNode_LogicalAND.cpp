@@ -23,6 +23,16 @@ void UFlowNode_LogicalAND::ExecuteInput(const FName& PinName)
 	}
 }
 
+void UFlowNode_LogicalAND::InvokeNode()
+{
+	// Mark all inputs as received so internal state is consistent after invoke
+	for (const FFlowPin& Pin : InputPins)
+	{
+		ExecutedInputNames.Add(Pin.PinName);
+	}
+	ActivationState = EFlowNodeState::Completed;
+}
+
 void UFlowNode_LogicalAND::Cleanup()
 {
 	ExecutedInputNames.Empty();
