@@ -16,6 +16,7 @@ enum class EFlowNodeStyle : uint8
 	Logic,
 	SubGraph UMETA(Hidden),
 	Development,
+	Quest,
 	Custom
 };
 #endif
