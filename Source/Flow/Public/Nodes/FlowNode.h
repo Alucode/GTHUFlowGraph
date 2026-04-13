@@ -147,6 +147,12 @@ protected:
 
 	uint8 CountNumberedInputs() const;
 	uint8 CountNumberedOutputs() const;
+
+	// Returns the next available numbered pin index (max existing numeric pin + 1).
+	// Unlike CountNumbered*, this is safe to use after a middle pin has been deleted
+	// because it can never produce a duplicate name.
+	uint8 NextNumberedInputIndex() const;
+	uint8 NextNumberedOutputIndex() const;
 	
 	TArray<FFlowPin> GetInputPins() const { return InputPins; }
 	TArray<FFlowPin> GetOutputPins() const { return OutputPins; }

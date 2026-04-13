@@ -126,7 +126,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "FlowSubsystem")
 		FFlowSaveGameData& GetLoadedSaveGame() { return LoadedSaveGame; }
 
-	// TODO: There should probably be a function to clear LoadedSaveGame, since the player could back out of the game and then choose another save data, or start a new game.
+	// Clears all loaded save game data and resets the loaded flag.
+	// Must be called whenever all subsystem data is wiped (new game, reset, etc.)
+	// so that subsequently spawned FlowComponents do not match stale save data.
+	UFUNCTION(BlueprintCallable, Category = "FlowSubsystem")
+		virtual void ResetLoadedSaveGame();
+
 	UFUNCTION(BlueprintPure, Category = "FlowSubsystem")
 		bool IsSaveGameLoaded() { return bSaveGameLoaded; }
 

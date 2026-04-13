@@ -68,6 +68,12 @@ void UFlowSubsystem::AbortActiveFlows()
 	RootInstances.Empty();
 }
 
+void UFlowSubsystem::ResetLoadedSaveGame()
+{
+	LoadedSaveGame = FFlowSaveGameData{};
+	bSaveGameLoaded = false;
+}
+
 void UFlowSubsystem::StartRootFlow(UObject* Owner, UFlowAsset* FlowAsset, const bool bAllowMultipleInstances /* = true */)
 {
 	UFlowAsset* NewFlow = CreateRootFlow(Owner, FlowAsset, bAllowMultipleInstances);

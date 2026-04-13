@@ -840,12 +840,12 @@ bool UFlowGraphNode::CanUserRemoveOutput(const UEdGraphPin* Pin) const
 
 void UFlowGraphNode::AddUserInput()
 {
-	AddInstancePin(EGPD_Input, FlowNode->CountNumberedInputs());
+	AddInstancePin(EGPD_Input, FlowNode->NextNumberedInputIndex());
 }
 
 void UFlowGraphNode::AddUserOutput()
 {
-	AddInstancePin(EGPD_Output, FlowNode->CountNumberedOutputs());
+	AddInstancePin(EGPD_Output, FlowNode->NextNumberedOutputIndex());
 }
 
 void UFlowGraphNode::AddInstancePin(const EEdGraphPinDirection Direction, const uint8 NumberedPinsAmount)

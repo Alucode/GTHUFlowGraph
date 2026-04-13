@@ -210,6 +210,32 @@ uint8 UFlowNode::CountNumberedOutputs() const
 	return Result;
 }
 
+uint8 UFlowNode::NextNumberedInputIndex() const
+{
+	int32 MaxIndex = -1;
+	for (const FFlowPin& Pin : InputPins)
+	{
+		if (Pin.PinName.ToString().IsNumeric())
+		{
+			MaxIndex = FMath::Max(MaxIndex, FCString::Atoi(*Pin.PinName.ToString()));
+		}
+	}
+	return static_cast<uint8>(MaxIndex + 1);
+}
+
+uint8 UFlowNode::NextNumberedOutputIndex() const
+{
+	int32 MaxIndex = -1;
+	for (const FFlowPin& Pin : OutputPins)
+	{
+		if (Pin.PinName.ToString().IsNumeric())
+		{
+			MaxIndex = FMath::Max(MaxIndex, FCString::Atoi(*Pin.PinName.ToString()));
+		}
+	}
+	return static_cast<uint8>(MaxIndex + 1);
+}
+
 TArray<FName> UFlowNode::GetInputNames() const
 {
 	TArray<FName> Result;
