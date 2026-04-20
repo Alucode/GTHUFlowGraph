@@ -44,6 +44,10 @@ private:
 	UPROPERTY()
 		TMap<UFlowAsset*, TWeakObjectPtr<UObject>> RootInstances;
 
+	/* Assets created by LoadRootFlow — loaded from save but not yet started via StartRootFlow */
+	UPROPERTY()
+		TMap<UFlowAsset*, TWeakObjectPtr<UObject>> PendingLoadedInstances;
+
 	/* Assets instanced by Sub Graph nodes */
 	UPROPERTY()
 		TMap<UFlowNode_SubGraph*, UFlowAsset*> InstancedSubFlows;

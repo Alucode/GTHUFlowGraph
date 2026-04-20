@@ -85,6 +85,18 @@ void UFlowSubsystem::StartRootFlow(UObject* Owner, UFlowAsset* FlowAsset, const 
 
 UFlowAsset* UFlowSubsystem::CreateRootFlow(UObject* Owner, UFlowAsset* FlowAsset, const bool bAllowMultipleInstances)
 {
+	// If a loaded-but-not-started instance exists, move it to RootInstances and return it.
+	for (auto It = PendingLoadedInstances.CreateIterator(); It; ++It)
+	{
+		if (Owner == It.Value().Get() && FlowAsset == It.Key()->GetTemplateAsset())
+		{
+			UFlowAsset* PendingInstance = It.Key();
+			It.RemoveCurrent();
+			RootInstances.Add(PendingInstance, Owner);
+			return PendingInstance;
+		}
+	}
+
 	for (const TPair<UFlowAsset*, TWeakObjectPtr<UObject>>& RootInstance : RootInstances)
 	{
 		if (Owner == RootInstance.Value.Get() && FlowAsset == RootInstance.Key->GetTemplateAsset())
@@ -126,6 +138,18 @@ void UFlowSubsystem::FinishRootFlow(UObject* Owner, UFlowAsset* TemplateAsset, c
 	{
 		RootInstances.Remove(InstanceToFinish);
 		InstanceToFinish->FinishFlow(FinishPolicy);
+		return;
+	}
+
+	// Also clean up pending loaded instances that were never started.
+	for (auto It = PendingLoadedInstances.CreateIterator(); It; ++It)
+	{
+		if (Owner && Owner == It.Value().Get() && It.Key() && It.Key()->GetTemplateAsset() == TemplateAsset)
+		{
+			It.Key()->FinishFlow(FinishPolicy);
+			It.RemoveCurrent();
+			return;
+		}
 	}
 }
 
@@ -361,10 +385,15 @@ void UFlowSubsystem::LoadRootFlow(UObject* Owner, UFlowAsset* FlowAsset, const F
 		if (AssetRecord.InstanceName == SavedAssetInstanceName
 			&& (FlowAsset->IsBoundToWorld() == false || AssetRecord.WorldName == GetWorld()->GetName()))
 		{
-			UFlowAsset* LoadedInstance = CreateRootFlow(Owner, FlowAsset, false);
+			// Use CreateFlowInstance directly so the instance is NOT added to RootInstances yet.
+			// It lives in PendingLoadedInstances until StartRootFlow is called, which moves it
+			// to RootInstances and calls StartFlow. This prevents the "same owner" guard from
+			// blocking StartRootFlow while still protecting against double-starting a running flow.
+			UFlowAsset* LoadedInstance = CreateFlowInstance(Owner, FlowAsset, AssetRecord.InstanceName);
 			if (LoadedInstance)
 			{
 				LoadedInstance->LoadInstance(AssetRecord);
+				PendingLoadedInstances.Add(LoadedInstance, Owner);
 			}
 			return;
 		}
