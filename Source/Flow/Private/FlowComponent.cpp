@@ -364,7 +364,7 @@ void UFlowComponent::OnRep_NotifyTagsFromAnotherComponent()
 
 void UFlowComponent::StartRootFlow()
 {
-	UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowComponent::StartRootFlow: RootFlow asset: '%s'"), RootFlow->GetName());
+	UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowComponent::StartRootFlow: RootFlow asset: '%s'"), *RootFlow->GetName());
 
 	if (RootFlow && IsFlowNetMode(RootFlowMode))
 	{
@@ -379,7 +379,7 @@ void UFlowComponent::StartRootFlow()
 
 void UFlowComponent::FinishRootFlow(UFlowAsset* TemplateAsset, const EFlowFinishPolicy FinishPolicy)
 {
-	UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowComponent::FinishRootFlow: Flow asset: '%s'"), TemplateAsset->GetName());
+	UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowComponent::FinishRootFlow: Flow asset: '%s'"), *TemplateAsset->GetName());
 
 	if (UFlowSubsystem* FlowSubsystem = GetFlowSubsystem())
 	{
@@ -431,7 +431,7 @@ void UFlowComponent::LoadRootFlow()
 	{
 		if (!SavedAssetInstanceName.IsEmpty())
 		{
-			UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowComponent::LoadRootFlow: SavedAssetInstanceName is "), SavedAssetInstanceName);
+			UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowComponent::LoadRootFlow: SavedAssetInstanceName is '%s'"), *SavedAssetInstanceName);
 
 			VerifyIdentityTags();
 

@@ -525,7 +525,7 @@ FFlowAssetSaveData UFlowAsset::SaveInstance(TArray<FFlowAssetSaveData>& SavedFlo
 
 void UFlowAsset::LoadInstance(const FFlowAssetSaveData& AssetRecord)
 {
-	UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowAsset::LoadInstance: AssetRecord.InstanceName: "), AssetRecord.InstanceName);
+	UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowAsset::LoadInstance: AssetRecord.InstanceName: '%s"), *AssetRecord.InstanceName);
 
 	FMemoryReader MemoryReader(AssetRecord.AssetData, true);
 	FFlowArchive Ar(MemoryReader);

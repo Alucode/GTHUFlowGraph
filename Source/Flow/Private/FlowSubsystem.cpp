@@ -83,7 +83,7 @@ void UFlowSubsystem::StartRootFlow(UObject* Owner, UFlowAsset* FlowAsset, const 
 {
 	UE_LOG(LogFlowSubsystem, Log,
 		TEXT("StartRootFlow: Owner: '%s', FlowAsset: '%s', bAllowMultipleInstances: '%s'"),
-		Owner->GetName(), FlowAsset->GetName(), bAllowMultipleInstances ? "true" : "false");
+		*Owner->GetName(), *FlowAsset->GetName(), bAllowMultipleInstances ? TEXT("true") : TEXT("false"));
 
 	UFlowAsset* NewFlow = CreateRootFlow(Owner, FlowAsset, bAllowMultipleInstances);
 	if (NewFlow)
