@@ -413,7 +413,7 @@ UFlowAsset* UFlowComponent::GetRootFlowInstance() const
 
 void UFlowComponent::SaveRootFlow(TArray<FFlowAssetSaveData>& SavedFlowInstances)
 {
-	UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowComponent::SaveRootFlow: Saving %s FlowInstances"), SavedFlowInstances.Num());
+	UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowComponent::SaveRootFlow: Saving %d FlowInstances"), SavedFlowInstances.Num());
 
 	if (UFlowAsset* FlowAssetInstance = GetRootFlowInstance())
 	{
