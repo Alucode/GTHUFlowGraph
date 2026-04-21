@@ -364,6 +364,8 @@ void UFlowComponent::OnRep_NotifyTagsFromAnotherComponent()
 
 void UFlowComponent::StartRootFlow()
 {
+	UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowComponent::StartRootFlow: RootFlow asset: '%s'"), RootFlow->GetName());
+
 	if (RootFlow && IsFlowNetMode(RootFlowMode))
 	{
 		if (UFlowSubsystem* FlowSubsystem = GetFlowSubsystem())
@@ -377,6 +379,8 @@ void UFlowComponent::StartRootFlow()
 
 void UFlowComponent::FinishRootFlow(UFlowAsset* TemplateAsset, const EFlowFinishPolicy FinishPolicy)
 {
+	UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowComponent::FinishRootFlow: Flow asset: '%s'"), TemplateAsset->GetName());
+
 	if (UFlowSubsystem* FlowSubsystem = GetFlowSubsystem())
 	{
 		FlowSubsystem->FinishRootFlow(this, TemplateAsset, FinishPolicy);
@@ -409,6 +413,8 @@ UFlowAsset* UFlowComponent::GetRootFlowInstance() const
 
 void UFlowComponent::SaveRootFlow(TArray<FFlowAssetSaveData>& SavedFlowInstances)
 {
+	UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowComponent::SaveRootFlow: Saving %s FlowInstances"), SavedFlowInstances.Num());
+
 	if (UFlowAsset* FlowAssetInstance = GetRootFlowInstance())
 	{
 		const FFlowAssetSaveData AssetRecord = FlowAssetInstance->SaveInstance(SavedFlowInstances);
@@ -425,6 +431,8 @@ void UFlowComponent::LoadRootFlow()
 	{
 		if (!SavedAssetInstanceName.IsEmpty())
 		{
+			UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowComponent::LoadRootFlow: SavedAssetInstanceName is "), SavedAssetInstanceName);
+
 			VerifyIdentityTags();
 
 			GetFlowSubsystem()->LoadRootFlow(this, RootFlow, SavedAssetInstanceName);
@@ -436,19 +444,30 @@ void UFlowComponent::LoadRootFlow()
 			// auto-start so the flow is never silently missing.
 			if (bAutoStartRootFlow && GetRootFlowInstance() == nullptr)
 			{
+				UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowComponent::LoadRootFlow: No instance to load. bAutoStartRoot is enabled. Starting new flow."));
+
 				StartRootFlow();
 			}
 		}
 		else if (bAutoStartRootFlow)
 		{
+			UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowComponent::LoadRootFlow: No saved flow instance. Starting new root flow."));
+
 			// No saved flow instance to restore - start fresh
 			StartRootFlow();
 		}
+		
+		return;
 	}
+	
+	UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowComponent::LoadRootFlow: No flow asset to load, or could not get flow subsystem."));
+
 }
 
 FFlowComponentSaveData UFlowComponent::SaveInstance()
 {
+	UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowComponent::SaveInstance"));
+
 	FFlowComponentSaveData ComponentRecord;
 	ComponentRecord.WorldName = GetWorld()->GetName();
 	ComponentRecord.ActorClassName = GetOwner()->GetClass()->GetName();
@@ -475,6 +494,8 @@ bool UFlowComponent::LoadInstance()
 			FString ActorClassName = GetOwner()->GetClass()->GetName();
 			if (ComponentRecord.WorldName == WorldName && ComponentRecord.ActorClassName == ActorClassName)
 			{
+				UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowComponent::LoadInstance: Loading component data for actor class name '%s'"), *ActorClassName);
+
 				FMemoryReader MemoryReader(ComponentRecord.ComponentData, true);
 				FFlowArchive Ar(MemoryReader);
 				Serialize(Ar);

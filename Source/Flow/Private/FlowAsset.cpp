@@ -352,6 +352,8 @@ void UFlowAsset::PreStartFlow()
 
 void UFlowAsset::StartFlow()
 {
+	UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowAsset::StartFlow"));
+
 	PreStartFlow();
 
 	ensureAlways(StartNode);
@@ -361,6 +363,8 @@ void UFlowAsset::StartFlow()
 
 void UFlowAsset::FinishFlow(const EFlowFinishPolicy InFinishPolicy, const bool bRemoveInstance /*= true*/)
 {
+	UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowAsset::FinishFlow"));
+
 	FinishPolicy = InFinishPolicy;
 
 	// end execution of this asset and all of its nodes
@@ -477,6 +481,8 @@ UFlowAsset* UFlowAsset::GetParentInstance() const
 
 FFlowAssetSaveData UFlowAsset::SaveInstance(TArray<FFlowAssetSaveData>& SavedFlowInstances)
 {
+	UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowAsset::SaveInstance: Saving %s Flow Instances"), SavedFlowInstances.Num());
+
 	FFlowAssetSaveData AssetRecord;
 	AssetRecord.WorldName = IsBoundToWorld() ? GetWorld()->GetName() : FString();
 	AssetRecord.InstanceName = GetName();
@@ -519,6 +525,8 @@ FFlowAssetSaveData UFlowAsset::SaveInstance(TArray<FFlowAssetSaveData>& SavedFlo
 
 void UFlowAsset::LoadInstance(const FFlowAssetSaveData& AssetRecord)
 {
+	UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowAsset::LoadInstance: AssetRecord.InstanceName: "), AssetRecord.InstanceName);
+
 	FMemoryReader MemoryReader(AssetRecord.AssetData, true);
 	FFlowArchive Ar(MemoryReader);
 	Serialize(Ar);

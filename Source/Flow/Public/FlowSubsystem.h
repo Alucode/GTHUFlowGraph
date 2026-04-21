@@ -23,6 +23,9 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FTaggedFlowComponentEvent, UFlowCom
  * - connects Flow Graphs with actors containing the Flow Component
  * - convenient base for project-specific systems
  */
+
+DECLARE_LOG_CATEGORY_EXTERN(LogFlowSubsystem, Log, All);
+
 UCLASS()
 class FLOW_API UFlowSubsystem : public UGameInstanceSubsystem
 {

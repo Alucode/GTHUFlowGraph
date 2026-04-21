@@ -15,6 +15,7 @@
 #include "Misc/Paths.h"
 #include "UObject/UObjectHash.h"
 
+DEFINE_LOG_CATEGORY(LogFlowSubsystem);
 
 UFlowSubsystem::UFlowSubsystem()
 	: UGameInstanceSubsystem()
@@ -51,6 +52,8 @@ void UFlowSubsystem::Deinitialize()
 
 void UFlowSubsystem::AbortActiveFlows()
 {
+	UE_LOG(LogFlowSubsystem, Log, TEXT("AbortActiveFlows"));
+
 	if (InstancedTemplates.Num() > 0)
 	{
 		for (int32 i = InstancedTemplates.Num() - 1; i >= 0; i--)
@@ -70,12 +73,18 @@ void UFlowSubsystem::AbortActiveFlows()
 
 void UFlowSubsystem::ResetLoadedSaveGame()
 {
+	UE_LOG(LogFlowSubsystem, Log, TEXT("ResetLoadedSaveGame"));
+
 	LoadedSaveGame = FFlowSaveGameData{};
 	bSaveGameLoaded = false;
 }
 
 void UFlowSubsystem::StartRootFlow(UObject* Owner, UFlowAsset* FlowAsset, const bool bAllowMultipleInstances /* = true */)
 {
+	UE_LOG(LogFlowSubsystem, Log,
+		TEXT("StartRootFlow: Owner: '%s', FlowAsset: '%s', bAllowMultipleInstances: '%s'"),
+		Owner->GetName(), FlowAsset->GetName(), bAllowMultipleInstances ? "true" : "false");
+
 	UFlowAsset* NewFlow = CreateRootFlow(Owner, FlowAsset, bAllowMultipleInstances);
 	if (NewFlow)
 	{
