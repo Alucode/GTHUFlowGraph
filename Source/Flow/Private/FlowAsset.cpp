@@ -481,7 +481,7 @@ UFlowAsset* UFlowAsset::GetParentInstance() const
 
 FFlowAssetSaveData UFlowAsset::SaveInstance(TArray<FFlowAssetSaveData>& SavedFlowInstances)
 {
-	UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowAsset::SaveInstance: Saving %s Flow Instances"), SavedFlowInstances.Num());
+	UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowAsset::SaveInstance: Saving %d Flow Instances"), SavedFlowInstances.Num());
 
 	FFlowAssetSaveData AssetRecord;
 	AssetRecord.WorldName = IsBoundToWorld() ? GetWorld()->GetName() : FString();
