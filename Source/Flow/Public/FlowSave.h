@@ -60,6 +60,9 @@ struct FLOW_API FFlowComponentSaveData
 	FString ActorClassName;
 
 	UPROPERTY(SaveGame)
+	FString FlowComponentName;
+	
+	UPROPERTY(SaveGame)
 	TArray<uint8> ComponentData;
 
 	friend FArchive& operator<<(FArchive& Ar, FFlowComponentSaveData& InComponentData)

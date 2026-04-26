@@ -453,6 +453,7 @@ FFlowComponentSaveData UFlowComponent::SaveInstance()
 	FFlowComponentSaveData ComponentRecord;
 	ComponentRecord.WorldName = GetWorld()->GetName();
 	ComponentRecord.ActorClassName = GetOwner()->GetClass()->GetName();
+	ComponentRecord.FlowComponentName = GetName();
 
 	// opportunity to collect data before serializing component
 	OnSave();
@@ -474,7 +475,10 @@ bool UFlowComponent::LoadInstance()
 		{
 			FString WorldName = GetWorld()->GetName();
 			FString ActorClassName = GetOwner()->GetClass()->GetName();
-			if (ComponentRecord.WorldName == WorldName && ComponentRecord.ActorClassName == ActorClassName)
+			FString FlowComponentName = GetName();
+			if (ComponentRecord.WorldName == WorldName
+				&& ComponentRecord.ActorClassName == ActorClassName
+				&& ComponentRecord.FlowComponentName == FlowComponentName)
 			{
 				UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowComponent::LoadInstance: Loading component data for actor class name '%s'"), *ActorClassName);
 
