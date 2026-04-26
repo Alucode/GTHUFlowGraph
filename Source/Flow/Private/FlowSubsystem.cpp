@@ -94,38 +94,23 @@ void UFlowSubsystem::StartRootFlow(UObject* Owner, UFlowAsset* FlowAsset, const 
 
 UFlowAsset* UFlowSubsystem::CreateRootFlow(UObject* Owner, UFlowAsset* FlowAsset, const bool bAllowMultipleInstances)
 {
-	// If a loaded-but-not-started instance exists, move it to RootInstances and return it.
-	for (auto It = PendingLoadedInstances.CreateIterator(); It; ++It)
-	{
-		if (Owner == It.Value().Get() && FlowAsset == It.Key()->GetTemplateAsset())
-		{
-			UFlowAsset* PendingInstance = It.Key();
-			It.RemoveCurrent();
-			RootInstances.Add(PendingInstance, Owner);
-			return PendingInstance;
-		}
-	}
-
 	for (const TPair<UFlowAsset*, TWeakObjectPtr<UObject>>& RootInstance : RootInstances)
 	{
 		if (Owner == RootInstance.Value.Get() && FlowAsset == RootInstance.Key->GetTemplateAsset())
 		{
-			UE_LOG(LogFlowSubsystem, Warning, TEXT("Attempted to start Root Flow for the same Owner again. Owner: %s. Flow Asset: %s."), *Owner->GetName(), *FlowAsset->GetName());
+			UE_LOG(LogFlow, Warning, TEXT("Attempted to start Root Flow for the same Owner again. Owner: %s. Flow Asset: %s."), *Owner->GetName(), *FlowAsset->GetName());
 			return nullptr;
 		}
 	}
 
 	if (!bAllowMultipleInstances && InstancedTemplates.Contains(FlowAsset))
 	{
-		UE_LOG(LogFlowSubsystem, Warning, TEXT("Attempted to start Root Flow, although there can be only a single instance. Owner: %s. Flow Asset: %s."), *Owner->GetName(), *FlowAsset->GetName());
+		UE_LOG(LogFlow, Warning, TEXT("Attempted to start Root Flow, although there can be only a single instance. Owner: %s. Flow Asset: %s."), *Owner->GetName(), *FlowAsset->GetName());
 		return nullptr;
 	}
 
 	UFlowAsset* NewFlow = CreateFlowInstance(Owner, FlowAsset);
-	if (NewFlow)
-	{
-		RootInstances.Add(NewFlow, Owner);
-	}
+	RootInstances.Add(NewFlow, Owner);
 
 	return NewFlow;
 }
@@ -133,7 +118,7 @@ UFlowAsset* UFlowSubsystem::CreateRootFlow(UObject* Owner, UFlowAsset* FlowAsset
 void UFlowSubsystem::FinishRootFlow(UObject* Owner, UFlowAsset* TemplateAsset, const EFlowFinishPolicy FinishPolicy)
 {
 	UFlowAsset* InstanceToFinish = nullptr;
-
+	
 	for (TPair<UFlowAsset*, TWeakObjectPtr<UObject>>& RootInstance : RootInstances)
 	{
 		if (Owner && Owner == RootInstance.Value.Get() && RootInstance.Key && RootInstance.Key->GetTemplateAsset() == TemplateAsset)
@@ -147,18 +132,6 @@ void UFlowSubsystem::FinishRootFlow(UObject* Owner, UFlowAsset* TemplateAsset, c
 	{
 		RootInstances.Remove(InstanceToFinish);
 		InstanceToFinish->FinishFlow(FinishPolicy);
-		return;
-	}
-
-	// Also clean up pending loaded instances that were never started.
-	for (auto It = PendingLoadedInstances.CreateIterator(); It; ++It)
-	{
-		if (Owner && Owner == It.Value().Get() && It.Key() && It.Key()->GetTemplateAsset() == TemplateAsset)
-		{
-			It.Key()->FinishFlow(FinishPolicy);
-			It.RemoveCurrent();
-			return;
-		}
 	}
 }
 
@@ -394,22 +367,17 @@ void UFlowSubsystem::LoadRootFlow(UObject* Owner, UFlowAsset* FlowAsset, const F
 		if (AssetRecord.InstanceName == SavedAssetInstanceName
 			&& (FlowAsset->IsBoundToWorld() == false || AssetRecord.WorldName == GetWorld()->GetName()))
 		{
-			// Use CreateFlowInstance directly so the instance is NOT added to RootInstances yet.
-			// It lives in PendingLoadedInstances until StartRootFlow is called, which moves it
-			// to RootInstances and calls StartFlow. This prevents the "same owner" guard from
-			// blocking StartRootFlow while still protecting against double-starting a running flow.
-			UFlowAsset* LoadedInstance = CreateFlowInstance(Owner, FlowAsset, AssetRecord.InstanceName);
+			UFlowAsset* LoadedInstance = CreateRootFlow(Owner, FlowAsset, false);
 			if (LoadedInstance)
 			{
 				LoadedInstance->LoadInstance(AssetRecord);
-				PendingLoadedInstances.Add(LoadedInstance, Owner);
 			}
 			return;
 		}
 	}
 }
 
-void UFlowSubsystem::LoadSubFlow(UFlowNode_SubGraph* SubGraphNode, const FString& SavedAssetInstanceName)
+void UFlowSubsystem::LoadSubFlow(UFlowNode_SubGraph* SubGraphNode, const FString& SavedAssetClassName)
 {
 	if (SubGraphNode->Asset.IsNull())
 	{
@@ -420,10 +388,10 @@ void UFlowSubsystem::LoadSubFlow(UFlowNode_SubGraph* SubGraphNode, const FString
 
 	for (const FFlowAssetSaveData& AssetRecord : LoadedSaveGame.FlowInstances)
 	{
-		if (AssetRecord.InstanceName == SavedAssetInstanceName
+		if (AssetRecord.InstanceName == SavedAssetClassName
 			&& ((SubGraphAsset && SubGraphAsset->IsBoundToWorld() == false) || AssetRecord.WorldName == GetWorld()->GetName()))
 		{
-			UFlowAsset* LoadedInstance = CreateSubFlow(SubGraphNode, SavedAssetInstanceName);
+			UFlowAsset* LoadedInstance = CreateSubFlow(SubGraphNode, SavedAssetClassName);
 			if (LoadedInstance)
 			{
 				LoadedInstance->LoadInstance(AssetRecord);

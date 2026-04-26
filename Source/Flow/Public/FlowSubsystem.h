@@ -128,7 +128,7 @@ public:
 
 
 	virtual void LoadRootFlow(UObject* Owner, UFlowAsset* FlowAsset, const FString& SavedAssetInstanceName);
-	virtual void LoadSubFlow(UFlowNode_SubGraph* SubGraphNode, const FString& SavedAssetInstanceName);
+	virtual void LoadSubFlow(UFlowNode_SubGraph* SubGraphNode, const FString& SavedAssetClassName);
 
 	UFUNCTION(BlueprintPure, Category = "FlowSubsystem")
 		FFlowSaveGameData& GetLoadedSaveGame() { return LoadedSaveGame; }

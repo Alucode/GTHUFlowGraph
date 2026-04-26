@@ -31,7 +31,7 @@ private:
 	bool bCanInstanceIdenticalAsset;
 	
 	UPROPERTY(SaveGame)
-	FString SavedAssetInstanceName;
+	FString SavedAssetClassName;
 
 protected:
 	virtual bool CanBeAssetInstanced() const;

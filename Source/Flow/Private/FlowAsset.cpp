@@ -501,7 +501,7 @@ FFlowAssetSaveData UFlowAsset::SaveInstance(TArray<FFlowAssetSaveData>& SavedFlo
 				if (SubFlowInstance.IsValid())
 				{
 					const FFlowAssetSaveData SubAssetRecord = SubFlowInstance->SaveInstance(SavedFlowInstances);
-					SubGraphNode->SavedAssetInstanceName = SubAssetRecord.InstanceName;
+					SubGraphNode->SavedAssetClassName = SubAssetRecord.InstanceName;
 				}
 			}
 

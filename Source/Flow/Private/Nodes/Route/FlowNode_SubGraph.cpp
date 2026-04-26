@@ -87,10 +87,10 @@ void UFlowNode_SubGraph::ForceFinishNode()
 
 void UFlowNode_SubGraph::OnLoad_Implementation()
 {
-	if (!SavedAssetInstanceName.IsEmpty() && !Asset.IsNull())
+	if (!SavedAssetClassName.IsEmpty() && !Asset.IsNull())
 	{
-		GetFlowSubsystem()->LoadSubFlow(this, SavedAssetInstanceName);
-		SavedAssetInstanceName = FString();
+		GetFlowSubsystem()->LoadSubFlow(this, SavedAssetClassName);
+		SavedAssetClassName = FString();
 	}
 }
 
