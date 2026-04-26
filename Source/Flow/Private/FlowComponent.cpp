@@ -437,24 +437,6 @@ void UFlowComponent::LoadRootFlow()
 
 			GetFlowSubsystem()->LoadRootFlow(this, RootFlow, SavedAssetInstanceName);
 			SavedAssetInstanceName = FString();
-
-			// Fallback: LoadRootFlow silently does nothing when the saved instance name
-			// is not found in LoadedSaveGame (e.g. after a DestroyData new-game reset
-			// where stale component data is still present). If no instance was created,
-			// auto-start so the flow is never silently missing.
-			if (bAutoStartRootFlow && GetRootFlowInstance() == nullptr)
-			{
-				UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowComponent::LoadRootFlow: No instance to load. bAutoStartRoot is enabled. Starting new flow."));
-
-				StartRootFlow();
-			}
-		}
-		else if (bAutoStartRootFlow)
-		{
-			UE_LOG(LogFlowSubsystem, Log, TEXT("UFlowComponent::LoadRootFlow: No saved flow instance. Starting new root flow."));
-
-			// No saved flow instance to restore - start fresh
-			StartRootFlow();
 		}
 		
 		return;
